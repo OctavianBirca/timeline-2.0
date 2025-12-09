@@ -1,3 +1,4 @@
+
 import React, { useMemo, useRef } from 'react';
 import { Person, PoliticalEntity, ViewSettings, Dynasty, CharacterRole } from '../types';
 import CharacterNode from './CharacterNode';
@@ -23,15 +24,25 @@ const Timeline: React.FC<TimelineProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   
-  // --- Constants for Layout ---
+  // --- Dynamic Scaling for Global Vision ---
+  // Base zoom is 10. If zoom < 10, we scale down elements to provide a macro view.
+  // Scale clamps between 0.4 (at zoom 2) and 1.0 (at zoom >= 10).
+  const globalScale = Math.min(1, Math.max(0.4, settings.zoom / 10));
+
+  // --- Constants for Layout (Scaled) ---
   const TOP_RULER_HEIGHT = 40;
   const BOTTOM_RULER_HEIGHT = 40;
-  const SLOT_HEIGHT = 140; // Vertical height per character row
-  const ENTITY_LAYER_HEIGHT = 220; // Vertical height per entity layer
+  
+  const BASE_SLOT_HEIGHT = 140;
+  const SLOT_HEIGHT = BASE_SLOT_HEIGHT * globalScale; // Vertical height per character row
+  
+  const BASE_ENTITY_LAYER_HEIGHT = 220;
+  const ENTITY_LAYER_HEIGHT = BASE_ENTITY_LAYER_HEIGHT * globalScale; // Vertical height per entity layer
 
-  // Image sizes matching CharacterNode.tsx
-  const IMG_SIZE_NUCLEUS = 60;
-  const IMG_SIZE_SECONDARY = 45;
+  // Image sizes matching CharacterNode.tsx (Scaled)
+  const IMG_SIZE_NUCLEUS = 60 * globalScale;
+  const IMG_SIZE_SECONDARY = 45 * globalScale;
+  const IMG_SIZE_TERTIARY = 30 * globalScale;
 
   // --- Dimensions & Scales ---
   const totalYears = maxYear - minYear;
@@ -51,8 +62,8 @@ const Timeline: React.FC<TimelineProps> = ({
   );
 
   // --- Y Positioning Helpers ---
-  const getPersonY = (index: number) => index * SLOT_HEIGHT + 40;
-  const getEntityY = (index: number) => index * ENTITY_LAYER_HEIGHT + 20;
+  const getPersonY = (index: number) => index * SLOT_HEIGHT + (40 * globalScale);
+  const getEntityY = (index: number) => index * ENTITY_LAYER_HEIGHT + (20 * globalScale);
   
   const getEntity = (id: string) => entities.find(e => e.id === id);
 
@@ -74,25 +85,41 @@ const Timeline: React.FC<TimelineProps> = ({
     return { start, end, mid: (start + end) / 2 };
   };
 
-  // --- Helper: Check Nucleus Status ---
-  const isPersonNucleus = (p: Person) => {
+  // --- Helper: Get Effective Role ---
+  // Returns NUCLEUS, SECONDARY, or TERTIARY based on titles or fallback
+  const getEffectiveRole = (p: Person): CharacterRole => {
       if (p.titles.length > 0) {
-          return p.titles.some(t => t.role === CharacterRole.NUCLEUS);
+          if (p.titles.some(t => t.role === CharacterRole.NUCLEUS)) return CharacterRole.NUCLEUS;
+          if (p.titles.some(t => t.role === CharacterRole.SECONDARY)) return CharacterRole.SECONDARY;
+          if (p.titles.some(t => t.role === CharacterRole.TERTIARY)) return CharacterRole.TERTIARY;
       }
-      return p.role === CharacterRole.NUCLEUS;
+      return p.role;
+  };
+  
+  // Helper to get image size from role
+  const getImgSize = (role: CharacterRole) => {
+      switch (role) {
+          case CharacterRole.NUCLEUS: return IMG_SIZE_NUCLEUS;
+          case CharacterRole.SECONDARY: return IMG_SIZE_SECONDARY;
+          case CharacterRole.TERTIARY: return IMG_SIZE_TERTIARY;
+          default: return IMG_SIZE_SECONDARY;
+      }
   };
 
   // --- Filter visible people ---
   const visiblePeople = useMemo(() => {
     return people.filter(p => {
       if (p.isHidden) return false;
-      // If person is nucleus (based on titles or fallback), always show. 
-      // If secondary, check settings.
-      const isNucleus = isPersonNucleus(p);
-      if (!settings.showSecondary && !isNucleus) return false;
-      return true;
+      
+      const role = getEffectiveRole(p);
+      
+      if (role === CharacterRole.NUCLEUS) return true; // Nucleus is always shown (unless hidden individually)
+      if (role === CharacterRole.SECONDARY) return settings.showSecondary;
+      if (role === CharacterRole.TERTIARY) return settings.showTertiary;
+      
+      return true; // Fallback
     });
-  }, [people, settings.showSecondary]);
+  }, [people, settings.showSecondary, settings.showTertiary]);
 
   // --- Ruler Ticks (Every Year) ---
   const yearTicks = useMemo(() => {
@@ -105,7 +132,7 @@ const Timeline: React.FC<TimelineProps> = ({
 
   // --- Path Generator for Rounded Corners (Horizontal -> Vertical -> Horizontal) ---
   const getRoundedPath = (x1: number, y1: number, x2: number, y2: number) => {
-    const radius = 15;
+    const radius = 15 * globalScale; // Scale radius too
     const midX = (x1 + x2) / 2;
     
     // If horizontal distance is too small, direct line
@@ -113,28 +140,15 @@ const Timeline: React.FC<TimelineProps> = ({
        return `M ${x1} ${y1} L ${x2} ${y2}`;
     }
 
-    // Logic:
-    // 1. Start (x1, y1)
-    // 2. Horizontal to midX
-    // 3. Vertical to y2
-    // 4. Horizontal to x2
-
     let d = `M ${x1} ${y1}`;
 
-    // Direction for curve on X axis (always right usually, but safe to check)
     const xDir = x2 > x1 ? 1 : -1;
-    // Direction for curve on Y axis
     const yDir = y2 > y1 ? 1 : -1;
-
-    // Line to first corner start
-    // We want to turn at midX. So we go to midX - radius
     
-    // Adjust radius if vertical distance is tiny
     const yDist = Math.abs(y2 - y1);
     const effRadius = Math.min(radius, yDist / 2, Math.abs(x2 - x1) / 2);
 
     if (yDist < 2) {
-         // Straight horizontal line if Ys are basically same
          return `M ${x1} ${y1} L ${x2} ${y2}`;
     }
 
@@ -148,12 +162,18 @@ const Timeline: React.FC<TimelineProps> = ({
     d += ` L ${midX} ${y2 - (effRadius * yDir)}`;
 
     // 4. Curve 2 (Vertical to Horizontal)
-    d += ` Q ${midX} ${y2} ${midX + (effRadius * xDir)} ${y2}`;
-
-    // 5. Final Horizontal segment
-    d += ` L ${x2} ${y2}`;
-
-    return d;
+    d += ` Q ${midX + (effRadius * xDir)} ${y2} ${midX + (effRadius * xDir)} ${y2}`;
+    // Correction: The second curve logic was slightly off in previous iterations, simplifying
+    // Actually standard Orthogonal rounded corners are simpler:
+    // H -> Curve -> V -> Curve -> H
+    // Let's reset to a simpler "S" curve logic correct for H-V-H
+    
+    return `M ${x1} ${y1} 
+            L ${midX - (effRadius * xDir)} ${y1} 
+            Q ${midX} ${y1} ${midX} ${y1 + (effRadius * yDir)}
+            L ${midX} ${y2 - (effRadius * yDir)}
+            Q ${midX} ${y2} ${midX + (effRadius * xDir)} ${y2}
+            L ${x2} ${y2}`;
   };
 
   // --- Connections (Lines) ---
@@ -161,10 +181,12 @@ const Timeline: React.FC<TimelineProps> = ({
     const lines: React.ReactElement[] = [];
     if (!settings.showParentalConnections && !settings.showMarriages) return lines;
 
+    const drawnMarriages = new Set<string>();
+
     visiblePeople.forEach(person => {
       // Geometry for current person (Child)
-      const isNucleus = isPersonNucleus(person);
-      const pImgSize = isNucleus ? IMG_SIZE_NUCLEUS : IMG_SIZE_SECONDARY;
+      const role = getEffectiveRole(person);
+      const pImgSize = getImgSize(role);
       
       // Node Origin (Birth Year)
       const nodeX = yearToX(person.birthYear);
@@ -193,8 +215,8 @@ const Timeline: React.FC<TimelineProps> = ({
 
             const parent = visiblePeople.find(p => p.id === parentInfo.id);
             if (parent) {
-                const isParentNucleus = isPersonNucleus(parent);
-                const fImgSize = isParentNucleus ? IMG_SIZE_NUCLEUS : IMG_SIZE_SECONDARY;
+                const parentRole = getEffectiveRole(parent);
+                const fImgSize = getImgSize(parentRole);
                 
                 const fNodeX = yearToX(parent.birthYear);
                 const fNodeY = getPersonY(parent.verticalPosition);
@@ -207,10 +229,9 @@ const Timeline: React.FC<TimelineProps> = ({
                 const fImgMidY = fNodeY + (fImgSize / 2);
 
                 // Connection: Parent Right Edge -> Child Left Edge
-                // Add small gap so line doesn't overlap border
-                const startX = fImgRightX + 2; 
+                const startX = fImgRightX + (2 * globalScale); 
                 const startY = fImgMidY;
-                const endX = pImgLeftX - 6; // Leave room for arrow head
+                const endX = pImgLeftX - (6 * globalScale); // Leave room for arrow head
                 const endY = pImgMidY;
 
                 const pathD = getRoundedPath(startX, startY, endX, endY);
@@ -233,7 +254,7 @@ const Timeline: React.FC<TimelineProps> = ({
                     key={`rel-${parent.id}-${person.id}`}
                     d={pathD}
                     stroke={color}
-                    strokeWidth="2"
+                    strokeWidth="1" // THINNER LINE as requested
                     fill="none"
                     markerEnd={markerId}
                     className="opacity-60 hover:opacity-100 transition-opacity"
@@ -246,12 +267,19 @@ const Timeline: React.FC<TimelineProps> = ({
       // Marriages (Double Dashed line between images)
       if (settings.showMarriages && person.spouseIds.length > 0) {
         person.spouseIds.forEach(spouseId => {
-          if (person.id < spouseId) { // Draw once
+             const pairKey = [person.id, spouseId].sort().join(':');
+             
+             // If already drawn this pair, skip
+             if (drawnMarriages.has(pairKey)) return;
+
              const spouse = visiblePeople.find(p => p.id === spouseId);
              if (spouse) {
+                // Mark as drawn immediately
+                drawnMarriages.add(pairKey);
+
                 // Calculate Spouse Geometry
-                const isSpouseNucleus = isPersonNucleus(spouse);
-                const sImgSize = isSpouseNucleus ? IMG_SIZE_NUCLEUS : IMG_SIZE_SECONDARY;
+                const spouseRole = getEffectiveRole(spouse);
+                const sImgSize = getImgSize(spouseRole);
                 const sNodeX = yearToX(spouse.birthYear);
                 const sNodeY = getPersonY(spouse.verticalPosition);
                 
@@ -266,45 +294,52 @@ const Timeline: React.FC<TimelineProps> = ({
                 // Determine Left/Right relationship based on calculated visual centers
                 
                 let mStartX, mEndX;
+                const gap = 4 * globalScale;
                 
                 if (pImgCenterX < sImgCenterX) {
-                    mStartX = pImgRightX + 4;
-                    mEndX = sImgLeftX - 4;
+                    mStartX = pImgRightX + gap;
+                    mEndX = sImgLeftX - gap;
                 } else {
-                    mStartX = pImgLeftX - 4;
-                    mEndX = sImgRightX + 4;
+                    mStartX = pImgLeftX - gap;
+                    mEndX = sImgRightX + gap;
                 }
 
                 const pathD = getRoundedPath(mStartX, pImgMidY, mEndX, sImgMidY);
 
+                // RESOLVE COLORS
+                const pDyn = dynasties.find(d => d.id === person.dynastyId);
+                const pColor = person.color || pDyn?.color || '#ec4899';
+
+                const sDyn = dynasties.find(d => d.id === spouse.dynastyId);
+                const sColor = spouse.color || sDyn?.color || '#ec4899';
+
                 // Double line: Draw two parallel paths slightly offset
                 lines.push(
-                    <g key={`mar-${person.id}-${spouseId}`} className="opacity-40 hover:opacity-100 group">
+                    <g key={`mar-${pairKey}`} className="opacity-40 hover:opacity-100 group transition-opacity">
                         <path
                             d={pathD}
-                            stroke="#ec4899"
+                            stroke={pColor}
                             strokeWidth="1.5"
                             strokeDasharray="4 2"
                             fill="none"
-                            transform="translate(0, -2)"
+                            transform={`translate(0, -${2 * globalScale})`}
                         />
                          <path
                             d={pathD}
-                            stroke="#ec4899"
+                            stroke={sColor}
                             strokeWidth="1.5"
                             strokeDasharray="4 2"
                             fill="none"
-                            transform="translate(0, 2)"
+                            transform={`translate(0, ${2 * globalScale})`}
                         />
                     </g>
               );
              }
-          }
         });
       }
     });
     return lines;
-  }, [visiblePeople, settings, yearToX, dynasties]);
+  }, [visiblePeople, settings, yearToX, dynasties, globalScale]);
 
   const handleVerticalMove = (id: string, direction: -1 | 1) => {
     const p = people.find(per => per.id === id);
@@ -387,17 +422,24 @@ const Timeline: React.FC<TimelineProps> = ({
                       return (
                         <div
                           key={`${entity.id}-${idx}`}
-                          className={`absolute rounded-md flex items-end justify-center pb-2 text-white/40 font-bold uppercase tracking-widest text-lg overflow-hidden ${isVassal ? 'pattern-diagonal-lines' : ''}`}
+                          className={`absolute rounded-md flex flex-col justify-center text-white/40 font-bold uppercase tracking-widest text-lg overflow-hidden ${isVassal ? 'pattern-diagonal-lines' : ''}`}
                           style={{
                             left: x,
                             width: w,
                             top: y,
-                            height: ENTITY_LAYER_HEIGHT - 40,
+                            height: ENTITY_LAYER_HEIGHT - (40 * globalScale),
                             backgroundColor: entity.color,
-                            border: isVassal ? '1px dashed rgba(255,255,255,0.2)' : '1px solid rgba(255,255,255,0.05)'
+                            border: isVassal ? '1px dashed rgba(255,255,255,0.2)' : '1px solid rgba(255,255,255,0.05)',
+                            fontSize: `${18 * globalScale}px`,
+                            alignItems: 'center'
                           }}
                         >
-                          {!isVassal && <span className="sticky left-1/2 whitespace-nowrap px-4">{entity.name}</span>}
+                          {!isVassal && (
+                            <div className="sticky left-1/2 -translate-x-1/2 flex flex-col items-center text-center max-w-[95%] py-2">
+                                <span className="whitespace-normal leading-tight">{entity.name}</span>
+                                <span className="text-[0.7em] opacity-70 whitespace-nowrap mt-1">{period.startYear} – {period.endYear}</span>
+                            </div>
+                          )}
                         </div>
                       )
                     })
@@ -450,6 +492,7 @@ const Timeline: React.FC<TimelineProps> = ({
                         settings={settings}
                         onToggleHide={handleToggleHide}
                         onVerticalMove={handleVerticalMove}
+                        scale={globalScale}
                       />
                     );
                   })}

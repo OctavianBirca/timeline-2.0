@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { Menu, X, Settings, Users, BookOpen, Crown, Flag, Layers, Search, FolderTree } from 'lucide-react';
-import { PoliticalEntity, Person, Dynasty, RankLevel } from '../types';
-import { LABELS, PREDEFINED_TITLES } from '../constants';
+import { PoliticalEntity, Person, Dynasty, TitleDefinition, HistoricalGroup } from '../types';
+import { LABELS } from '../constants';
+import { RankLevel } from '../types';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -9,9 +10,14 @@ interface SidebarProps {
   entities: PoliticalEntity[];
   people: Person[];
   dynasties: Dynasty[];
+  titleDefinitions: TitleDefinition[];
+  groups: HistoricalGroup[];
   onSelectEntity: (id: string) => void;
   onEditPerson: (id: string) => void;
   onEditEntity: (id: string) => void;
+  onEditTitle: (id: string) => void;
+  onEditDynasty: (id: string) => void;
+  onEditGroup: (id: string) => void;
   onAddNew: (type: string) => void;
 }
 
@@ -23,9 +29,14 @@ const Sidebar: React.FC<SidebarProps> = ({
   entities, 
   people, 
   dynasties,
+  titleDefinitions,
+  groups,
   onSelectEntity,
   onEditPerson,
   onEditEntity,
+  onEditTitle,
+  onEditDynasty,
+  onEditGroup,
   onAddNew
 }) => {
   const [activeTab, setActiveTab] = useState<'history' | 'admin'>('history');
@@ -52,22 +63,18 @@ const Sidebar: React.FC<SidebarProps> = ({
           d.name.toLowerCase().includes(lowerFilter)
         );
       case 'titles':
-        // Show defined Titles (Types), not instances
-        return PREDEFINED_TITLES.filter(t => 
+        // Show defined Titles (Types)
+        return titleDefinitions.filter(t => 
            t.label.toLowerCase().includes(lowerFilter)
         );
       case 'groups':
-        // Mock groups
-        const groups = [
-            { id: 'g1', name: 'History of France' },
-            { id: 'g2', name: 'History of Rome' },
-            { id: 'g3', name: 'Holy Roman Empire' }
-        ];
-        return groups.filter(g => g.name.toLowerCase().includes(lowerFilter));
+        return groups.filter(g => 
+          g.name.toLowerCase().includes(lowerFilter)
+        );
       default:
         return [];
     }
-  }, [adminTab, filterText, people, entities, dynasties]);
+  }, [adminTab, filterText, people, entities, dynasties, titleDefinitions, groups]);
 
   return (
     <div 
@@ -196,7 +203,12 @@ const Sidebar: React.FC<SidebarProps> = ({
                                         <div className="flex-1 min-w-0">
                                             <div className="text-sm font-medium text-gray-200 truncate">{d.name}</div>
                                         </div>
-                                         <button className="opacity-0 group-hover:opacity-100 text-xs text-amber-500 px-2 py-1 hover:bg-amber-900/30 rounded transition-opacity">Edit</button>
+                                         <button 
+                                            onClick={(e) => { e.stopPropagation(); onEditDynasty(d.id); }}
+                                            className="opacity-0 group-hover:opacity-100 text-xs text-amber-500 px-2 py-1 hover:bg-amber-900/30 rounded transition-opacity"
+                                         >
+                                            Edit
+                                         </button>
                                     </div>
                                 ))}
                                 
@@ -209,7 +221,12 @@ const Sidebar: React.FC<SidebarProps> = ({
                                             <div className="text-sm font-medium text-gray-200 truncate">{t.label}</div>
                                             <div className="text-xs text-gray-500 truncate">Rank Level: {t.rank}</div>
                                         </div>
-                                         <button className="opacity-0 group-hover:opacity-100 text-xs text-amber-500 px-2 py-1 hover:bg-amber-900/30 rounded transition-opacity">Edit</button>
+                                         <button 
+                                            onClick={(e) => { e.stopPropagation(); onEditTitle(t.id); }}
+                                            className="opacity-0 group-hover:opacity-100 text-xs text-amber-500 px-2 py-1 hover:bg-amber-900/30 rounded transition-opacity"
+                                         >
+                                            Edit
+                                         </button>
                                     </div>
                                 ))}
 
@@ -219,7 +236,12 @@ const Sidebar: React.FC<SidebarProps> = ({
                                         <div className="flex-1 min-w-0">
                                             <div className="text-sm font-medium text-gray-200 truncate">{g.name}</div>
                                         </div>
-                                         <button className="opacity-0 group-hover:opacity-100 text-xs text-amber-500 px-2 py-1 hover:bg-amber-900/30 rounded transition-opacity">Edit</button>
+                                         <button 
+                                            onClick={(e) => { e.stopPropagation(); onEditGroup(g.id); }}
+                                            className="opacity-0 group-hover:opacity-100 text-xs text-amber-500 px-2 py-1 hover:bg-amber-900/30 rounded transition-opacity"
+                                         >
+                                            Edit
+                                         </button>
                                     </div>
                                 ))}
 

@@ -1,14 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactDOM from 'react-dom';
-import { Person, Dynasty, PoliticalEntity, Title, RankLevel, CharacterRole, TitlePeriod } from '../types';
-import { X, Plus, Trash2, Save, User, Crown, Heart, Palette, ChevronDown, Search, Calendar } from 'lucide-react';
-import { PREDEFINED_TITLES, MONTHS } from '../constants';
+import { Person, Dynasty, PoliticalEntity, Title, RankLevel, CharacterRole, TitlePeriod, TitleDefinition } from '../types';
+import { X, Plus, Trash2, Save, User, Crown, Heart, Palette, ChevronDown, Search, Calendar, EyeOff } from 'lucide-react';
+import { MONTHS } from '../constants';
 
 interface PersonEditorProps {
   person: Person;
   allPeople: Person[];
   dynasties: Dynasty[];
   entities: PoliticalEntity[];
+  titleDefinitions: TitleDefinition[];
   onSave: (updatedPerson: Person) => void;
   onCancel: () => void;
 }
@@ -203,6 +204,7 @@ const PersonEditor: React.FC<PersonEditorProps> = ({
   allPeople,
   dynasties,
   entities,
+  titleDefinitions,
   onSave,
   onCancel
 }) => {
@@ -224,20 +226,21 @@ const PersonEditor: React.FC<PersonEditorProps> = ({
   };
 
   // Helper to manage Title Periods
-  const handlePeriodChange = (titleIndex: number, periodIndex: number, field: keyof TitlePeriod, value: number) => {
+  const handlePeriodChange = (titleIndex: number, periodIndex: number, field: keyof TitlePeriod, value: number | boolean) => {
      setFormData(prev => {
          const newTitles = [...prev.titles];
          const newPeriods = [...newTitles[titleIndex].periods];
-         // Ensure value is stored as number or undefined if 0
-         const val = value === 0 ? undefined : value;
          
          // Special handling: Year can be 0 theoretically but usually not in this app, 
          // but month/day being 0 means undefined/empty.
          if (field === 'startYear' || field === 'endYear') {
              newPeriods[periodIndex] = { ...newPeriods[periodIndex], [field]: value };
+         } else if (typeof value === 'boolean') {
+             newPeriods[periodIndex] = { ...newPeriods[periodIndex], [field]: value };
          } else {
-            // For optional fields
+            // For optional numeric fields
             const newP = { ...newPeriods[periodIndex] };
+            const val = value === 0 ? undefined : value;
             if (val) {
                 (newP as any)[field] = val;
             } else {
@@ -272,7 +275,7 @@ const PersonEditor: React.FC<PersonEditorProps> = ({
 
   // Handle changing the predefined Title Type
   const handleTitleTypeSelect = (index: number, defId: string) => {
-      const def = PREDEFINED_TITLES.find(t => t.id === defId);
+      const def = titleDefinitions.find(t => t.id === defId);
       if (!def) return;
       
       setFormData(prev => {
@@ -310,7 +313,7 @@ const PersonEditor: React.FC<PersonEditorProps> = ({
               label = currentTitle.name.split(' : ')[0];
           } else {
               // 2. Try matching against predefined list
-              const match = PREDEFINED_TITLES.find(t => currentTitle.name.includes(t.label));
+              const match = titleDefinitions.find(t => currentTitle.name.includes(t.label));
               if (match) label = match.label;
               else label = currentTitle.name;
           }
@@ -383,16 +386,20 @@ const PersonEditor: React.FC<PersonEditorProps> = ({
         .map(p => ({ value: p.id, label: `${p.officialName} (${p.birthYear}-${p.deathYear})` }))
   ];
 
-  const dynastyOptions = dynasties.map(d => ({ value: d.id, label: d.name }));
+  const dynastyOptions = [
+    { value: "", label: "- No Dynasty -" },
+    ...dynasties.map(d => ({ value: d.id, label: d.name }))
+  ];
   
   const entityOptions = entities.map(e => ({ value: e.id, label: e.name }));
 
   const roleOptions = [
       { value: CharacterRole.NUCLEUS, label: "Nucleus (Main)" },
-      { value: CharacterRole.SECONDARY, label: "Secondary" }
+      { value: CharacterRole.SECONDARY, label: "Secondary" },
+      { value: CharacterRole.TERTIARY, label: "Tertiary (Minor)" }
   ];
 
-  const titleTypeOptions = PREDEFINED_TITLES.map(t => ({ value: t.id, label: t.label }));
+  const titleTypeOptions = titleDefinitions.map(t => ({ value: t.id, label: t.label }));
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
@@ -609,10 +616,10 @@ const PersonEditor: React.FC<PersonEditorProps> = ({
                             {formData.titles.map((title, idx) => {
                                 // Robustly determine current def ID for dropdown
                                 let currentDefId = "";
-                                const exactMatch = PREDEFINED_TITLES.find(t => title.name.startsWith(t.label));
+                                const exactMatch = titleDefinitions.find(t => title.name.startsWith(t.label));
                                 if (exactMatch) currentDefId = exactMatch.id;
                                 else {
-                                    const partialMatch = PREDEFINED_TITLES.find(t => title.name.includes(t.label));
+                                    const partialMatch = titleDefinitions.find(t => title.name.includes(t.label));
                                     if (partialMatch) currentDefId = partialMatch.id;
                                 }
 
@@ -661,20 +668,12 @@ const PersonEditor: React.FC<PersonEditorProps> = ({
                                             </div>
                                             <div className="w-32">
                                                 <label className="block text-[10px] uppercase text-gray-500 font-bold mb-1">Rank Level</label>
-                                                <select
+                                                <input 
+                                                    type="number"
                                                     value={title.rank}
                                                     onChange={(e) => handleTitleRankChange(idx, parseInt(e.target.value))}
                                                     className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-sm text-white focus:ring-1 focus:ring-amber-500 h-[38px]"
-                                                >
-                                                    {Object.keys(RankLevel)
-                                                        .filter(k => isNaN(Number(k)))
-                                                        .map(key => (
-                                                            <option key={key} value={RankLevel[key as keyof typeof RankLevel]}>
-                                                                {key} ({RankLevel[key as keyof typeof RankLevel]})
-                                                            </option>
-                                                        ))
-                                                    }
-                                                </select>
+                                                />
                                             </div>
                                         </div>
                                     </div>
@@ -716,18 +715,29 @@ const PersonEditor: React.FC<PersonEditorProps> = ({
                                         <div className="space-y-2">
                                             {title.periods.map((period, pIdx) => (
                                                 <div key={pIdx} className="bg-gray-900/50 p-2 rounded border border-gray-700/50 relative">
-                                                    {title.periods.length > 1 && (
-                                                        <button 
-                                                            onClick={() => removePeriod(idx, pIdx)} 
-                                                            className="absolute top-2 right-2 text-gray-600 hover:text-red-400 p-1"
-                                                            title="Remove Period"
-                                                        >
-                                                            <X size={14} />
-                                                        </button>
-                                                    )}
+                                                    <div className="absolute top-2 right-2 flex items-center gap-2">
+                                                        <label className="flex items-center gap-1 text-[10px] text-gray-400 cursor-pointer select-none">
+                                                            <input 
+                                                                type="checkbox" 
+                                                                checked={period.isHidden || false}
+                                                                onChange={(e) => handlePeriodChange(idx, pIdx, 'isHidden', e.target.checked)}
+                                                                className="rounded bg-gray-800 border-gray-700 text-amber-500 focus:ring-0 w-3 h-3"
+                                                            />
+                                                            Hide Dates
+                                                        </label>
+                                                        {title.periods.length > 1 && (
+                                                            <button 
+                                                                onClick={() => removePeriod(idx, pIdx)} 
+                                                                className="text-gray-600 hover:text-red-400 p-1"
+                                                                title="Remove Period"
+                                                            >
+                                                                <X size={14} />
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                     
                                                     {/* Vertical stack of dates */}
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pr-6">
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pr-24 pt-4 md:pt-0">
                                                         <DateGroup 
                                                             label="Start Date"
                                                             year={period.startYear}

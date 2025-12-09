@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { PoliticalEntity, EntityPeriod, CharacterRole } from '../types';
-import { X, Plus, Trash2, Save, Flag, Layers } from 'lucide-react';
+import { X, Plus, Trash2, Save, Flag, Layers, Palette } from 'lucide-react';
 
 interface EntityEditorProps {
   entity: PoliticalEntity;
@@ -8,6 +8,29 @@ interface EntityEditorProps {
   onSave: (updatedEntity: PoliticalEntity) => void;
   onCancel: () => void;
 }
+
+// Helpers for Color Conversion
+const rgbaToHex = (rgba: string) => {
+  const match = rgba.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if (!match) return "#000000";
+  const r = parseInt(match[1]).toString(16).padStart(2, '0');
+  const g = parseInt(match[2]).toString(16).padStart(2, '0');
+  const b = parseInt(match[3]).toString(16).padStart(2, '0');
+  return `#${r}${g}${b}`;
+};
+
+const getAlpha = (rgba: string) => {
+   const match = rgba.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+   if (!match || !match[4]) return 1;
+   return parseFloat(match[4]);
+};
+
+const hexToRgba = (hex: string, alpha: number) => {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
 
 const EntityEditor: React.FC<EntityEditorProps> = ({
   entity,
@@ -19,6 +42,11 @@ const EntityEditor: React.FC<EntityEditorProps> = ({
 
   const handleChange = (field: keyof PoliticalEntity, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleColorChange = (hex: string, alpha: number) => {
+      const rgba = hexToRgba(hex, alpha);
+      handleChange('color', rgba);
   };
 
   const handlePeriodChange = (index: number, field: keyof EntityPeriod, value: any) => {
@@ -51,7 +79,8 @@ const EntityEditor: React.FC<EntityEditorProps> = ({
 
   const roleOptions = [
     { value: CharacterRole.NUCLEUS, label: "Nucleus (Main)" },
-    { value: CharacterRole.SECONDARY, label: "Secondary" }
+    { value: CharacterRole.SECONDARY, label: "Secondary" },
+    { value: CharacterRole.TERTIARY, label: "Tertiary (Minor)" }
   ];
 
   const entityOptions = [
@@ -60,6 +89,10 @@ const EntityEditor: React.FC<EntityEditorProps> = ({
       .filter(e => e.id !== entity.id)
       .map(e => ({ value: e.id, label: e.name }))
   ];
+
+  // Derive current visual controls from formData.color
+  const currentHex = rgbaToHex(formData.color);
+  const currentAlpha = getAlpha(formData.color);
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
@@ -96,17 +129,35 @@ const EntityEditor: React.FC<EntityEditorProps> = ({
                             className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none"
                         />
                     </div>
-                    <div>
-                        <label className="block text-xs font-medium text-gray-400 mb-1">Color (RGBA)</label>
-                        <div className="flex gap-2 items-center">
-                            <div className="w-8 h-8 rounded border border-gray-600 shrink-0" style={{ backgroundColor: formData.color }}></div>
+                    
+                    {/* Color Picker with Opacity */}
+                    <div className="bg-gray-800/50 p-3 rounded-lg border border-gray-700">
+                        <label className="block text-xs font-medium text-gray-400 mb-2 flex items-center gap-1">
+                             <Palette size={12} /> Appearance
+                        </label>
+                        <div className="flex gap-3 items-center mb-3">
                             <input 
-                                type="text" 
-                                value={formData.color} 
-                                onChange={e => handleChange('color', e.target.value)}
-                                className="flex-1 bg-gray-800 border border-gray-700 rounded p-2 text-sm text-white focus:ring-1 focus:ring-blue-500 font-mono"
-                                placeholder="rgba(0,0,0,0.5)"
+                                type="color" 
+                                value={currentHex} 
+                                onChange={e => handleColorChange(e.target.value, currentAlpha)}
+                                className="w-10 h-10 rounded cursor-pointer bg-transparent border-0 p-0"
                             />
+                            <div className="flex-1">
+                                <div className="flex justify-between text-[10px] text-gray-500 mb-1">
+                                    <span>Opacity</span>
+                                    <span>{Math.round(currentAlpha * 100)}%</span>
+                                </div>
+                                <input 
+                                    type="range" 
+                                    min="0" max="1" step="0.05"
+                                    value={currentAlpha}
+                                    onChange={e => handleColorChange(currentHex, parseFloat(e.target.value))}
+                                    className="w-full h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                />
+                            </div>
+                        </div>
+                        <div className="text-[10px] font-mono text-gray-500 bg-gray-900 p-1.5 rounded border border-gray-800 text-center">
+                            {formData.color}
                         </div>
                     </div>
                 </div>

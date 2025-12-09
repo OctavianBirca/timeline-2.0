@@ -14,6 +14,7 @@ interface CharacterNodeProps {
   settings: ViewSettings;
   onToggleHide: (id: string) => void;
   onVerticalMove: (id: string, direction: -1 | 1) => void;
+  scale?: number; // Dynamic scale factor for semantic zooming (default 1)
 }
 
 const CharacterNode: React.FC<CharacterNodeProps> = ({
@@ -26,24 +27,30 @@ const CharacterNode: React.FC<CharacterNodeProps> = ({
   contentOffset = 0,
   settings,
   onToggleHide,
-  onVerticalMove
+  onVerticalMove,
+  scale = 1
 }) => {
   const [isHovered, setIsHovered] = useState(false);
 
-  // Styling based on role and dynasty
-  // A person is Nucleus if ANY of their titles is NUCLEUS, or if fallback role is NUCLEUS
-  const isNucleus = useMemo(() => {
+  // Determine Effective Role: Nucleus > Secondary > Tertiary
+  const effectiveRole = useMemo(() => {
     if (person.titles.length > 0) {
-        return person.titles.some(t => t.role === CharacterRole.NUCLEUS);
+        if (person.titles.some(t => t.role === CharacterRole.NUCLEUS)) return CharacterRole.NUCLEUS;
+        if (person.titles.some(t => t.role === CharacterRole.SECONDARY)) return CharacterRole.SECONDARY;
+        if (person.titles.some(t => t.role === CharacterRole.TERTIARY)) return CharacterRole.TERTIARY;
     }
-    return person.role === CharacterRole.NUCLEUS;
+    return person.role;
   }, [person]);
 
   // Use person's custom color if set, otherwise fallback to dynasty color
   const borderColor = person.color || dynasty?.color || '#9ca3af';
   
-  // Reduced sizes: Nucleus 80->60, Secondary 60->45
-  const imageSize = isNucleus ? 60 : 45; // px
+  // Sizing Logic: Nucleus 60, Secondary 45, Tertiary 30 (all scaled)
+  let baseSize = 45;
+  if (effectiveRole === CharacterRole.NUCLEUS) baseSize = 60;
+  else if (effectiveRole === CharacterRole.TERTIARY) baseSize = 30;
+
+  const imageSize = baseSize * scale;
   
   // Calculate specific width for the lifespan line
   const lifespanWidth = (person.deathYear - person.birthYear) * settings.zoom;
@@ -79,6 +86,13 @@ const CharacterNode: React.FC<CharacterNodeProps> = ({
       e.dataTransfer.setData("text/plain", person.id);
   };
 
+  // Layout calculations based on scale
+  const lifespanTopOffset = imageSize + (4 * scale);
+  const namePlateWidth = 200 * scale;
+  const fontSizeBase = Math.max(8, 12 * scale); // Clamp min font size for readability
+  const fontSizeSmall = Math.max(7, 9 * scale);
+  const titleTrackHeight = 26 * scale;
+
   return (
     <div
       className="absolute flex flex-col items-start group select-none"
@@ -96,11 +110,12 @@ const CharacterNode: React.FC<CharacterNodeProps> = ({
       {/* Lifespan Line (Strictly Birth to Death) */}
       {settings.showLifespans && (
          <div 
-          className="absolute top-[calc(60px+4px)] h-1 bg-gray-600 rounded z-10"
+          className="absolute h-1 bg-gray-600 rounded z-10"
           style={{ 
               left: 0,
               width: `${Math.max(lifespanWidth, 2)}px`,
-              top: isNucleus ? '64px' : '49px' // Position just under image
+              top: `${lifespanTopOffset}px`,
+              height: `${Math.max(2, 4 * scale)}px`
           }}
          />
       )}
@@ -115,7 +130,10 @@ const CharacterNode: React.FC<CharacterNodeProps> = ({
         }}
       >
         {/* Action Buttons Overlay (Visible on Hover) */}
-        <div className={`absolute -top-6 flex gap-2 transition-opacity duration-200 ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
+        <div 
+          className={`absolute flex gap-2 transition-opacity duration-200 ${isHovered ? 'opacity-100' : 'opacity-0'}`}
+          style={{ top: `-${24 * scale}px`, transform: `scale(${scale})` }}
+        >
             <button 
             onClick={() => onVerticalMove(person.id, -1)}
             className="p-1 bg-gray-800 rounded-full hover:bg-gray-700 text-gray-300"
@@ -147,39 +165,62 @@ const CharacterNode: React.FC<CharacterNodeProps> = ({
 
         {/* Portrait */}
         <div 
-            className={`rounded-full border-2 overflow-hidden bg-gray-900 shadow-lg relative z-20`}
+            className={`rounded-full overflow-hidden bg-gray-900 shadow-lg relative z-20`}
             style={{
-            borderColor: borderColor,
-            width: imageSize,
-            height: imageSize,
-            minHeight: imageSize,
+                borderColor: borderColor,
+                borderWidth: `${2 * scale}px`,
+                borderStyle: 'solid',
+                width: imageSize,
+                height: imageSize,
+                minHeight: imageSize,
             }}
         >
             {person.imageUrl ? (
             <img src={person.imageUrl} alt={person.officialName} className="w-full h-full object-cover" />
             ) : (
-            <div className="w-full h-full flex items-center justify-center bg-gray-800 text-[10px] text-center">
+            <div 
+                className="w-full h-full flex items-center justify-center bg-gray-800 text-center"
+                style={{ fontSize: `${10 * scale}px` }}
+            >
                 No Img
             </div>
             )}
         </div>
 
         {/* Name Plate */}
-        <div className="mt-2 flex flex-col gap-1 w-full items-center relative z-30">
-            <div className="bg-gray-800/90 backdrop-blur-sm border border-gray-700 rounded-md p-1.5 text-center shadow-lg max-w-[200px]">
+        <div 
+            className="flex flex-col gap-1 w-full items-center relative z-30"
+            style={{ marginTop: `${8 * scale}px` }}
+        >
+            <div 
+                className="bg-gray-800/90 backdrop-blur-sm border border-gray-700 rounded-md text-center shadow-lg"
+                style={{ 
+                    padding: `${6 * scale}px`, 
+                    maxWidth: `${namePlateWidth}px`
+                }}
+            >
                 
                 {/* Name */}
-                <div className="font-bold text-xs text-white truncate leading-tight">
+                <div 
+                    className="font-bold text-white truncate leading-tight"
+                    style={{ fontSize: `${fontSizeBase}px` }}
+                >
                     {person.officialName}
                 </div>
                 
                 {/* Lifespan Years & Duration */}
                 {settings.showLifespans && (
-                    <div className="mt-1">
-                        <div className="text-[9px] text-gray-400 font-mono leading-tight">
+                    <div style={{ marginTop: `${4 * scale}px` }}>
+                        <div 
+                            className="text-gray-400 font-mono leading-tight"
+                            style={{ fontSize: `${fontSizeSmall}px` }}
+                        >
                         {formatDate(person.birthYear, person.birthMonth, person.birthDay)} — {formatDate(person.deathYear, person.deathMonth, person.deathDay)}
                         </div>
-                        <div className="text-[9px] text-gray-500 italic leading-tight">
+                        <div 
+                            className="text-gray-500 italic leading-tight"
+                            style={{ fontSize: `${fontSizeSmall}px` }}
+                        >
                             ({ageDisplay})
                         </div>
                     </div>
@@ -189,7 +230,10 @@ const CharacterNode: React.FC<CharacterNodeProps> = ({
       </div>
 
       {/* Titles Stack (Timeline Accurate - Reset to start at Birth Year) */}
-      <div className="flex flex-col w-full relative z-30 mt-1 items-start">
+      <div 
+        className="flex flex-col w-full relative z-30 items-start"
+        style={{ marginTop: `${4 * scale}px` }}
+      >
         {person.titles.map((title) => {
           const entity = getEntity(title.entityId);
           // Determine the range of the whole Title (from min start to max end) to define the track
@@ -207,10 +251,12 @@ const CharacterNode: React.FC<CharacterNodeProps> = ({
           return (
             <div 
               key={title.id}
-              className="relative mb-0.5 h-[26px]"
+              className="relative"
               style={{
                 marginLeft: `${trackLeft}px`,
                 width: `${Math.max(trackWidth, 4)}px`,
+                height: `${titleTrackHeight}px`,
+                marginBottom: `${2 * scale}px`
               }}
             >
                 {/* Render distinct segments for each period */}
@@ -220,6 +266,10 @@ const CharacterNode: React.FC<CharacterNodeProps> = ({
                     
                     // Logic to determine if text should be inside or below
                     const isNarrow = segWidth < 80;
+                    
+                    // Check if period dates should be hidden
+                    const showDates = !period.isHidden;
+                    const isHiddenPeriod = period.isHidden || false;
 
                     return (
                         <div
@@ -232,21 +282,33 @@ const CharacterNode: React.FC<CharacterNodeProps> = ({
                         >
                             {/* The Colored Bar */}
                             <div 
-                                className="w-full h-full rounded-sm border shadow-sm overflow-hidden flex flex-col justify-center"
+                                className="w-full h-full rounded-sm overflow-hidden flex flex-col justify-center transition-colors"
                                 style={{
-                                    backgroundColor: bgColor,
-                                    borderColor: borderColor,
+                                    backgroundColor: isHiddenPeriod ? 'transparent' : bgColor,
+                                    borderColor: isHiddenPeriod ? 'transparent' : borderColor,
+                                    borderWidth: isHiddenPeriod ? 0 : 1,
+                                    borderStyle: 'solid',
+                                    boxShadow: isHiddenPeriod ? 'none' : undefined
                                 }}
                             >
-                                {/* Title Name (Inside) - only if wide enough */}
+                                {/* Title Name (Inside) - only if wide enough AND not hidden */}
                                 {pIdx === 0 && !isNarrow && (
-                                    <div className="text-[9px] font-bold text-white leading-none break-words whitespace-normal text-center px-1">
+                                    <div 
+                                        className="font-bold text-white leading-none break-words whitespace-normal text-center px-1"
+                                        style={{ 
+                                            fontSize: `${fontSizeSmall}px`,
+                                            textShadow: isHiddenPeriod ? '0 1px 2px rgba(0,0,0,0.8)' : 'none'
+                                        }}
+                                    >
                                         {title.name}
                                     </div>
                                 )}
-                                {/* Years (Inside) - if wide enough */}
-                                {segWidth > 30 && (
-                                    <div className="text-[8px] text-white/90 leading-none text-center mt-0.5 font-mono">
+                                {/* Years (Inside) - if wide enough AND visible */}
+                                {showDates && segWidth > 30 && (
+                                    <div 
+                                        className="text-white/90 leading-none text-center font-mono"
+                                        style={{ fontSize: `${Math.max(6, 8 * scale)}px`, marginTop: `${2 * scale}px` }}
+                                    >
                                         {formatDate(period.startYear, period.startMonth)}–{period.endYear}
                                     </div>
                                 )}
@@ -255,9 +317,14 @@ const CharacterNode: React.FC<CharacterNodeProps> = ({
                             {/* Title Name (Below) - if narrow */}
                             {pIdx === 0 && isNarrow && (
                                 <div 
-                                    className="absolute top-full mt-1 bg-gray-900/90 text-gray-200 text-[9px] font-medium px-1.5 py-0.5 rounded border border-gray-700 whitespace-nowrap z-50 shadow-md"
+                                    className="absolute top-full bg-gray-900/90 text-gray-200 font-medium rounded border border-gray-700 whitespace-nowrap z-50 shadow-md"
+                                    style={{
+                                        marginTop: `${4 * scale}px`,
+                                        padding: `${2 * scale}px ${6 * scale}px`,
+                                        fontSize: `${fontSizeSmall}px`
+                                    }}
                                 >
-                                    {title.name} <span className="text-gray-500 font-mono">({formatDate(period.startYear, period.startMonth)}-{period.endYear})</span>
+                                    {title.name} {showDates && <span className="text-gray-500 font-mono">({formatDate(period.startYear, period.startMonth)}-{period.endYear})</span>}
                                 </div>
                             )}
                         </div>

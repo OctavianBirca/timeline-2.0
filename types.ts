@@ -1,6 +1,8 @@
+
 export enum CharacterRole {
   NUCLEUS = 'NUCLEUS',
-  SECONDARY = 'SECONDARY'
+  SECONDARY = 'SECONDARY',
+  TERTIARY = 'TERTIARY'
 }
 
 export enum EntityType {
@@ -27,6 +29,7 @@ export interface TitlePeriod {
   endYear: number;
   endMonth?: number;
   endDay?: number;
+  isHidden?: boolean; // If true, hides the date text in the visualization
 }
 
 export interface Title {
@@ -37,6 +40,12 @@ export interface Title {
   role: CharacterRole; // NUCLEUS or SECONDARY relative to this entity
   periods: TitlePeriod[];
   positionIndex: number; // For vertical stacking within a character card
+}
+
+export interface TitleDefinition {
+  id: string;
+  label: string;
+  rank: RankLevel;
 }
 
 export interface EntityPeriod {
@@ -58,6 +67,12 @@ export interface Dynasty {
   id: string;
   name: string;
   color: string;
+  description?: string;
+}
+
+export interface HistoricalGroup {
+  id: string;
+  name: string;
   description?: string;
 }
 
@@ -91,7 +106,8 @@ export interface Person {
 export interface ViewSettings {
   zoom: number; // Pixels per year
   showLifespans: boolean;
-  showSecondary: boolean;
+  showSecondary: boolean; // Controls SECONDARY role
+  showTertiary: boolean;  // Controls TERTIARY role
   showGrid: boolean;
   showMarriages: boolean;
   showParentalConnections: boolean;

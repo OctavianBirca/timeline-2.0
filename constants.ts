@@ -1,4 +1,4 @@
-import { CharacterRole, Dynasty, Person, PoliticalEntity, RankLevel } from './types';
+import { CharacterRole, Dynasty, Person, PoliticalEntity, RankLevel, HistoricalGroup } from './types';
 
 export const PIXELS_PER_YEAR_DEFAULT = 10;
 export const MIN_YEAR = 450;
@@ -63,6 +63,12 @@ export const PREDEFINED_TITLES = [
 ];
 
 // --- MOCK DATA ---
+
+export const MOCK_GROUPS: HistoricalGroup[] = [
+  { id: 'g1', name: 'History of France', description: 'From Merovingians to Napoleon' },
+  { id: 'g2', name: 'History of Rome', description: 'The Rise and Fall' },
+  { id: 'g3', name: 'Holy Roman Empire' }
+];
 
 export const MOCK_DYNASTIES: Dynasty[] = [
   { id: 'merovingian', name: 'Merovingian', color: '#10b981' }, // Emerald
