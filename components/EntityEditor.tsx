@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { PoliticalEntity, EntityPeriod, CharacterRole } from '../types';
 import { X, Plus, Trash2, Save, Flag, Layers, Palette } from 'lucide-react';
@@ -175,16 +176,30 @@ const EntityEditor: React.FC<EntityEditorProps> = ({
                             ))}
                         </select>
                     </div>
-                    <div>
-                        <label className="block text-xs font-medium text-gray-400 mb-1 flex items-center gap-1">
-                             <Layers size={12} /> Height Index (Vertical Layer)
-                        </label>
-                        <input 
-                            type="number" 
-                            value={formData.heightIndex} 
-                            onChange={e => handleChange('heightIndex', parseInt(e.target.value))}
-                            className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none"
-                        />
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-xs font-medium text-gray-400 mb-1 flex items-center gap-1">
+                                <Layers size={12} /> Height Index
+                            </label>
+                            <input 
+                                type="number" 
+                                value={formData.heightIndex} 
+                                onChange={e => handleChange('heightIndex', parseInt(e.target.value))}
+                                className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none"
+                            />
+                        </div>
+                         <div>
+                            <label className="block text-xs font-medium text-gray-400 mb-1 flex items-center gap-1">
+                                <Layers size={12} /> Row Span (Layers)
+                            </label>
+                            <input 
+                                type="number" 
+                                min={1}
+                                value={formData.rowSpan || 1} 
+                                onChange={e => handleChange('rowSpan', parseInt(e.target.value))}
+                                className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none"
+                            />
+                        </div>
                     </div>
                 </div>
             </div>

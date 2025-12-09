@@ -11,6 +11,7 @@ interface TimelineProps {
   minYear: number;
   maxYear: number;
   updatePerson: (person: Person) => void;
+  onToggleFamily: (id: string, type: 'ancestors' | 'descendants' | 'spouses') => void;
 }
 
 const Timeline: React.FC<TimelineProps> = ({
@@ -20,13 +21,12 @@ const Timeline: React.FC<TimelineProps> = ({
   dynasties,
   minYear,
   maxYear,
-  updatePerson
+  updatePerson,
+  onToggleFamily
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   
   // --- Dynamic Scaling for Global Vision ---
-  // Base zoom is 10. If zoom < 10, we scale down elements to provide a macro view.
-  // Scale clamps between 0.4 (at zoom 2) and 1.0 (at zoom >= 10).
   const globalScale = Math.min(1, Math.max(0.4, settings.zoom / 10));
 
   // --- Constants for Layout (Scaled) ---
@@ -50,7 +50,7 @@ const Timeline: React.FC<TimelineProps> = ({
   const yearToX = (year: number) => (year - minYear) * settings.zoom;
 
   // --- Height Calculation ---
-  const maxEntityIndex = useMemo(() => Math.max(0, ...entities.map(e => e.heightIndex)), [entities]);
+  const maxEntityIndex = useMemo(() => Math.max(0, ...entities.map(e => (e.heightIndex + (e.rowSpan || 1) - 1))), [entities]);
   const maxPersonIndex = useMemo(() => Math.max(0, ...people.filter(p => !p.isHidden).map(p => p.verticalPosition)), [people]);
 
   const contentHeight = Math.max(
@@ -68,13 +68,11 @@ const Timeline: React.FC<TimelineProps> = ({
   const getEntity = (id: string) => entities.find(e => e.id === id);
 
   // --- Helper: Get Reign Geometry ---
-  // Returns start, end, and mid year of the "active/reign" period
   const getReignGeometry = (p: Person) => {
     let start = p.birthYear;
     let end = p.deathYear;
     
     if (p.titles.length > 0) {
-      // Flatten all periods from all titles
       const allPeriods = p.titles.flatMap(t => t.periods);
       if (allPeriods.length > 0) {
           start = Math.min(...allPeriods.map(period => period.startYear));
@@ -86,7 +84,6 @@ const Timeline: React.FC<TimelineProps> = ({
   };
 
   // --- Helper: Get Effective Role ---
-  // Returns NUCLEUS, SECONDARY, or TERTIARY based on titles or fallback
   const getEffectiveRole = (p: Person): CharacterRole => {
       if (p.titles.length > 0) {
           if (p.titles.some(t => t.role === CharacterRole.NUCLEUS)) return CharacterRole.NUCLEUS;
@@ -109,17 +106,21 @@ const Timeline: React.FC<TimelineProps> = ({
   // --- Filter visible people ---
   const visiblePeople = useMemo(() => {
     return people.filter(p => {
+      // 1. Manually Hidden overrides everything (unless unhidden via top bar)
       if (p.isHidden) return false;
+      
+      // 2. Forced Visible (e.g., expanded spouse) overrides Role Filters
+      if (settings.forceVisibleIds && settings.forceVisibleIds.includes(p.id)) return true;
       
       const role = getEffectiveRole(p);
       
-      if (role === CharacterRole.NUCLEUS) return true; // Nucleus is always shown (unless hidden individually)
+      if (role === CharacterRole.NUCLEUS) return true; // Nucleus is always shown
       if (role === CharacterRole.SECONDARY) return settings.showSecondary;
       if (role === CharacterRole.TERTIARY) return settings.showTertiary;
       
       return true; // Fallback
     });
-  }, [people, settings.showSecondary, settings.showTertiary]);
+  }, [people, settings.showSecondary, settings.showTertiary, settings.forceVisibleIds]);
 
   // --- Ruler Ticks (Every Year) ---
   const yearTicks = useMemo(() => {
@@ -130,21 +131,18 @@ const Timeline: React.FC<TimelineProps> = ({
     return ticks;
   }, [minYear, maxYear]);
 
-  // --- Path Generator for Rounded Corners (Horizontal -> Vertical -> Horizontal) ---
+  // --- Path Generator (S-Curve) ---
   const getRoundedPath = (x1: number, y1: number, x2: number, y2: number) => {
-    const radius = 15 * globalScale; // Scale radius too
+    const radius = 15 * globalScale; 
     const midX = (x1 + x2) / 2;
     
-    // If horizontal distance is too small, direct line
     if (Math.abs(x2 - x1) < radius * 2) {
        return `M ${x1} ${y1} L ${x2} ${y2}`;
     }
 
     let d = `M ${x1} ${y1}`;
-
     const xDir = x2 > x1 ? 1 : -1;
     const yDir = y2 > y1 ? 1 : -1;
-    
     const yDist = Math.abs(y2 - y1);
     const effRadius = Math.min(radius, yDist / 2, Math.abs(x2 - x1) / 2);
 
@@ -152,28 +150,13 @@ const Timeline: React.FC<TimelineProps> = ({
          return `M ${x1} ${y1} L ${x2} ${y2}`;
     }
 
-    // 1. Horizontal segment to first turn
     d += ` L ${midX - (effRadius * xDir)} ${y1}`;
-    
-    // 2. Curve 1 (Horizontal to Vertical)
     d += ` Q ${midX} ${y1} ${midX} ${y1 + (effRadius * yDir)}`;
-
-    // 3. Vertical segment
     d += ` L ${midX} ${y2 - (effRadius * yDir)}`;
-
-    // 4. Curve 2 (Vertical to Horizontal)
-    d += ` Q ${midX + (effRadius * xDir)} ${y2} ${midX + (effRadius * xDir)} ${y2}`;
-    // Correction: The second curve logic was slightly off in previous iterations, simplifying
-    // Actually standard Orthogonal rounded corners are simpler:
-    // H -> Curve -> V -> Curve -> H
-    // Let's reset to a simpler "S" curve logic correct for H-V-H
+    d += ` Q ${midX} ${y2} ${midX + (effRadius * xDir)} ${y2}`;
+    d += ` L ${x2} ${y2}`;
     
-    return `M ${x1} ${y1} 
-            L ${midX - (effRadius * xDir)} ${y1} 
-            Q ${midX} ${y1} ${midX} ${y1 + (effRadius * yDir)}
-            L ${midX} ${y2 - (effRadius * yDir)}
-            Q ${midX} ${y2} ${midX + (effRadius * xDir)} ${y2}
-            L ${x2} ${y2}`;
+    return d;
   };
 
   // --- Connections (Lines) ---
@@ -188,15 +171,11 @@ const Timeline: React.FC<TimelineProps> = ({
       const role = getEffectiveRole(person);
       const pImgSize = getImgSize(role);
       
-      // Node Origin (Birth Year)
       const nodeX = yearToX(person.birthYear);
       const nodeY = getPersonY(person.verticalPosition);
-      
-      // Calculate Image Center based on Reign
       const pReign = getReignGeometry(person);
       const pReignMidOffset = (pReign.mid - person.birthYear) * settings.zoom;
       
-      // Absolute Coordinates of Image Center and Edges
       const pImgCenterX = nodeX + pReignMidOffset;
       const pImgLeftX = pImgCenterX - (pImgSize / 2);
       const pImgRightX = pImgCenterX + (pImgSize / 2);
@@ -204,7 +183,6 @@ const Timeline: React.FC<TimelineProps> = ({
 
       // Parent -> Child (Father AND Mother)
       if (settings.showParentalConnections) {
-        // Swap order: Render Mother first (bottom), then Father (top)
         const parents = [
             { id: person.motherId, type: 'mother' },
             { id: person.fatherId, type: 'father' }
@@ -228,20 +206,16 @@ const Timeline: React.FC<TimelineProps> = ({
                 const fImgRightX = fImgCenterX + (fImgSize / 2);
                 const fImgMidY = fNodeY + (fImgSize / 2);
 
-                // Connection: Parent Right Edge -> Child Left Edge
                 const startX = fImgRightX + (2 * globalScale); 
                 const startY = fImgMidY;
-                const endX = pImgLeftX - (6 * globalScale); // Leave room for arrow head
+                const endX = pImgLeftX - (6 * globalScale); 
                 const endY = pImgMidY;
 
                 const pathD = getRoundedPath(startX, startY, endX, endY);
                 
                 const dynasty = dynasties.find(d => d.id === parent.dynastyId);
-                
-                // Use person override color if present, else dynasty color
                 const color = parent.color || dynasty?.color || '#666';
                 
-                // Determine marker
                 let markerId = 'url(#arrowhead-default)';
                 if (parent.color) {
                     markerId = `url(#arrowhead-person-${parent.id})`;
@@ -254,7 +228,7 @@ const Timeline: React.FC<TimelineProps> = ({
                     key={`rel-${parent.id}-${person.id}`}
                     d={pathD}
                     stroke={color}
-                    strokeWidth="1" // THINNER LINE as requested
+                    strokeWidth="1"
                     fill="none"
                     markerEnd={markerId}
                     className="opacity-60 hover:opacity-100 transition-opacity"
@@ -264,20 +238,17 @@ const Timeline: React.FC<TimelineProps> = ({
         });
       }
 
-      // Marriages (Double Dashed line between images)
+      // Marriages
       if (settings.showMarriages && person.spouseIds.length > 0) {
         person.spouseIds.forEach(spouseId => {
              const pairKey = [person.id, spouseId].sort().join(':');
              
-             // If already drawn this pair, skip
              if (drawnMarriages.has(pairKey)) return;
 
              const spouse = visiblePeople.find(p => p.id === spouseId);
              if (spouse) {
-                // Mark as drawn immediately
                 drawnMarriages.add(pairKey);
 
-                // Calculate Spouse Geometry
                 const spouseRole = getEffectiveRole(spouse);
                 const sImgSize = getImgSize(spouseRole);
                 const sNodeX = yearToX(spouse.birthYear);
@@ -290,8 +261,6 @@ const Timeline: React.FC<TimelineProps> = ({
                 const sImgLeftX = sImgCenterX - (sImgSize / 2);
                 const sImgRightX = sImgCenterX + (sImgSize / 2);
                 const sImgMidY = sNodeY + (sImgSize / 2);
-                
-                // Determine Left/Right relationship based on calculated visual centers
                 
                 let mStartX, mEndX;
                 const gap = 4 * globalScale;
@@ -306,14 +275,12 @@ const Timeline: React.FC<TimelineProps> = ({
 
                 const pathD = getRoundedPath(mStartX, pImgMidY, mEndX, sImgMidY);
 
-                // RESOLVE COLORS
                 const pDyn = dynasties.find(d => d.id === person.dynastyId);
                 const pColor = person.color || pDyn?.color || '#ec4899';
 
                 const sDyn = dynasties.find(d => d.id === spouse.dynastyId);
                 const sColor = spouse.color || sDyn?.color || '#ec4899';
 
-                // Double line: Draw two parallel paths slightly offset
                 lines.push(
                     <g key={`mar-${pairKey}`} className="opacity-40 hover:opacity-100 group transition-opacity">
                         <path
@@ -367,8 +334,7 @@ const Timeline: React.FC<TimelineProps> = ({
                 minHeight: '100%' 
             }}
         >
-            
-            {/* --- Sticky Top Ruler --- */}
+            {/* Top Ruler */}
             <div 
               className="sticky top-0 z-40 bg-gray-950/95 backdrop-blur border-b border-gray-700 shadow-md shrink-0"
               style={{ height: TOP_RULER_HEIGHT }}
@@ -378,7 +344,6 @@ const Timeline: React.FC<TimelineProps> = ({
                  const isFive = y % 5 === 0;
                  const showLabel = settings.zoom > 15 ? true : settings.zoom > 5 ? isFive : isDecade;
                  const h = isDecade ? 16 : isFive ? 10 : 5;
-                 
                  return (
                    <React.Fragment key={`t-ruler-${y}`}>
                      <div 
@@ -398,10 +363,9 @@ const Timeline: React.FC<TimelineProps> = ({
                })}
             </div>
 
-            {/* --- Main Content Body --- */}
+            {/* Content Body */}
             <div className="relative flex-grow w-full" style={{ height: contentHeight }}>
-                
-                {/* Background Grid Lines */}
+                {/* Grid */}
                 {settings.showGrid && (
                   <div className="absolute inset-0 z-0 pointer-events-none">
                     {yearTicks.filter(y => y % 10 === 0).map(y => (
@@ -410,7 +374,7 @@ const Timeline: React.FC<TimelineProps> = ({
                   </div>
                 )}
 
-                {/* Political Entities Layer */}
+                {/* Entities */}
                 <div className="absolute inset-0 z-10 pointer-events-none">
                   {entities.map((entity, i) => (
                     entity.periods.map((period, idx) => {
@@ -418,7 +382,9 @@ const Timeline: React.FC<TimelineProps> = ({
                       const w = yearToX(period.endYear) - x;
                       const isVassal = !!period.isVassalTo;
                       const y = getEntityY(entity.heightIndex);
-                      
+                      const rowSpan = entity.rowSpan || 1;
+                      const height = (ENTITY_LAYER_HEIGHT * rowSpan) - (40 * globalScale);
+
                       return (
                         <div
                           key={`${entity.id}-${idx}`}
@@ -427,7 +393,7 @@ const Timeline: React.FC<TimelineProps> = ({
                             left: x,
                             width: w,
                             top: y,
-                            height: ENTITY_LAYER_HEIGHT - (40 * globalScale),
+                            height: height,
                             backgroundColor: entity.color,
                             border: isVassal ? '1px dashed rgba(255,255,255,0.2)' : '1px solid rgba(255,255,255,0.05)',
                             fontSize: `${18 * globalScale}px`,
@@ -446,19 +412,17 @@ const Timeline: React.FC<TimelineProps> = ({
                   ))}
                 </div>
 
-                {/* Connections SVG Layer */}
+                {/* SVG Connections */}
                 <svg className="absolute inset-0 w-full h-full pointer-events-none z-20 overflow-visible">
                   <defs>
                     <marker id="arrowhead-default" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
                       <polygon points="0 0, 8 3, 0 6" fill="#888" />
                     </marker>
-                    {/* Generate colored markers for each dynasty */}
                     {dynasties.map(d => (
                          <marker key={d.id} id={`arrowhead-${d.id}`} markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
                             <polygon points="0 0, 8 3, 0 6" fill={d.color} />
                          </marker>
                     ))}
-                    {/* Generate custom markers for people with override colors */}
                     {visiblePeople.filter(p => p.color).map(p => (
                          <marker key={`person-color-${p.id}`} id={`arrowhead-person-${p.id}`} markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
                             <polygon points="0 0, 8 3, 0 6" fill={p.color} />
@@ -468,14 +432,12 @@ const Timeline: React.FC<TimelineProps> = ({
                   {connections}
                 </svg>
 
-                {/* Character Nodes Layer */}
+                {/* Nodes */}
                 <div className="absolute inset-0 z-30">
                   {visiblePeople.map(p => {
                     const width = yearToX(p.deathYear) - yearToX(p.birthYear);
                     const x = yearToX(p.birthYear);
                     const y = getPersonY(p.verticalPosition);
-                    
-                    // Calculate visual offset based on Reign Center
                     const reign = getReignGeometry(p);
                     const contentOffset = (reign.mid - p.birthYear) * settings.zoom;
 
@@ -487,11 +449,12 @@ const Timeline: React.FC<TimelineProps> = ({
                         getEntity={getEntity}
                         x={x}
                         y={y}
-                        width={Math.max(width, 140)} // Keep min width for rendering container interaction
+                        width={Math.max(width, 140)} 
                         contentOffset={contentOffset}
                         settings={settings}
                         onToggleHide={handleToggleHide}
                         onVerticalMove={handleVerticalMove}
+                        onToggleFamily={onToggleFamily}
                         scale={globalScale}
                       />
                     );
@@ -499,7 +462,7 @@ const Timeline: React.FC<TimelineProps> = ({
                 </div>
             </div>
 
-            {/* --- Sticky Bottom Ruler --- */}
+            {/* Bottom Ruler */}
             <div 
               className="sticky bottom-0 z-40 bg-gray-950/95 backdrop-blur border-t border-gray-700 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.3)] shrink-0 mt-auto"
               style={{ height: BOTTOM_RULER_HEIGHT }}

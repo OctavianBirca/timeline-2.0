@@ -1,3 +1,4 @@
+
 import { CharacterRole, Dynasty, Person, PoliticalEntity, RankLevel, HistoricalGroup } from './types';
 
 export const PIXELS_PER_YEAR_DEFAULT = 10;
@@ -83,6 +84,7 @@ export const MOCK_ENTITIES: PoliticalEntity[] = [
     color: 'rgba(16, 185, 129, 0.2)', // Light green opacity
     role: CharacterRole.NUCLEUS,
     heightIndex: 0,
+    rowSpan: 1,
     periods: [{ startYear: 481, endYear: 843 }]
   },
   {
@@ -91,6 +93,7 @@ export const MOCK_ENTITIES: PoliticalEntity[] = [
     color: 'rgba(59, 130, 246, 0.2)', // Blue
     role: CharacterRole.SECONDARY,
     heightIndex: 2, // Lower down
+    rowSpan: 1,
     periods: [{ startYear: 511, endYear: 751, isVassalTo: 'kingdom_franks' }]
   },
   {
@@ -99,6 +102,7 @@ export const MOCK_ENTITIES: PoliticalEntity[] = [
     color: 'rgba(239, 68, 68, 0.2)', // Red
     role: CharacterRole.NUCLEUS,
     heightIndex: 0,
+    rowSpan: 1,
     periods: [{ startYear: 800, endYear: 840 }]
   }
 ];

@@ -61,6 +61,7 @@ export interface PoliticalEntity {
   periods: EntityPeriod[];
   role: CharacterRole; // Is this a nucleus entity for the current view?
   heightIndex: number; // Vertical slot allocation
+  rowSpan: number; // How many vertical layers this entity occupies
 }
 
 export interface Dynasty {
@@ -111,6 +112,7 @@ export interface ViewSettings {
   showGrid: boolean;
   showMarriages: boolean;
   showParentalConnections: boolean;
+  forceVisibleIds: string[]; // List of IDs to show regardless of role settings
 }
 
 export interface LanguageDictionary {

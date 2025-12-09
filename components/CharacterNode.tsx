@@ -1,7 +1,8 @@
+
 import React, { useState, useMemo } from 'react';
 import { Person, Dynasty, ViewSettings, PoliticalEntity, CharacterRole } from '../types';
 import { MONTHS } from '../constants';
-import { EyeOff, Heart, GripVertical } from 'lucide-react';
+import { EyeOff, Heart, GripVertical, ChevronLeft, ChevronRight, Plus, Minus } from 'lucide-react';
 
 interface CharacterNodeProps {
   person: Person;
@@ -14,6 +15,7 @@ interface CharacterNodeProps {
   settings: ViewSettings;
   onToggleHide: (id: string) => void;
   onVerticalMove: (id: string, direction: -1 | 1) => void;
+  onToggleFamily: (id: string, type: 'ancestors' | 'descendants' | 'spouses') => void;
   scale?: number; // Dynamic scale factor for semantic zooming (default 1)
 }
 
@@ -28,6 +30,7 @@ const CharacterNode: React.FC<CharacterNodeProps> = ({
   settings,
   onToggleHide,
   onVerticalMove,
+  onToggleFamily,
   scale = 1
 }) => {
   const [isHovered, setIsHovered] = useState(false);
@@ -93,6 +96,15 @@ const CharacterNode: React.FC<CharacterNodeProps> = ({
   const fontSizeSmall = Math.max(7, 9 * scale);
   const titleTrackHeight = 26 * scale;
 
+  // Toggle button style
+  const sideBtnStyle = {
+      width: `${16 * scale}px`,
+      height: `${16 * scale}px`,
+      top: '50%',
+      marginTop: `-${8 * scale}px`,
+      fontSize: `${10 * scale}px`
+  };
+
   return (
     <div
       className="absolute flex flex-col items-start group select-none"
@@ -142,8 +154,9 @@ const CharacterNode: React.FC<CharacterNodeProps> = ({
             <GripVertical size={12} />
             </button>
             <button 
+            onClick={() => onToggleFamily(person.id, 'spouses')}
             className="p-1 bg-gray-800 rounded-full hover:bg-gray-700 text-red-400"
-            title="Toggle Marriages"
+            title="Toggle Spouses Visibility"
             >
             <Heart size={12} />
             </button>
@@ -163,28 +176,51 @@ const CharacterNode: React.FC<CharacterNodeProps> = ({
             </button>
         </div>
 
-        {/* Portrait */}
-        <div 
-            className={`rounded-full overflow-hidden bg-gray-900 shadow-lg relative z-20`}
-            style={{
-                borderColor: borderColor,
-                borderWidth: `${2 * scale}px`,
-                borderStyle: 'solid',
-                width: imageSize,
-                height: imageSize,
-                minHeight: imageSize,
-            }}
-        >
-            {person.imageUrl ? (
-            <img src={person.imageUrl} alt={person.officialName} className="w-full h-full object-cover" />
-            ) : (
-            <div 
-                className="w-full h-full flex items-center justify-center bg-gray-800 text-center"
-                style={{ fontSize: `${10 * scale}px` }}
+        {/* Portrait Container */}
+        <div className="relative">
+            {/* Expand Ancestors (Left) */}
+            <button
+                onClick={() => onToggleFamily(person.id, 'ancestors')} 
+                className={`absolute -left-5 bg-gray-800 text-gray-400 rounded-full hover:bg-amber-900 hover:text-amber-500 border border-gray-600 flex items-center justify-center transition-opacity z-30 ${isHovered ? 'opacity-100' : 'opacity-0'}`}
+                style={sideBtnStyle}
+                title="Expand Ancestors"
             >
-                No Img
+                <Plus size={10 * scale} />
+            </button>
+
+            {/* Portrait */}
+            <div 
+                className={`rounded-full overflow-hidden bg-gray-900 shadow-lg relative z-20`}
+                style={{
+                    borderColor: borderColor,
+                    borderWidth: `${2 * scale}px`,
+                    borderStyle: 'solid',
+                    width: imageSize,
+                    height: imageSize,
+                    minHeight: imageSize,
+                }}
+            >
+                {person.imageUrl ? (
+                <img src={person.imageUrl} alt={person.officialName} className="w-full h-full object-cover" />
+                ) : (
+                <div 
+                    className="w-full h-full flex items-center justify-center bg-gray-800 text-center"
+                    style={{ fontSize: `${10 * scale}px` }}
+                >
+                    No Img
+                </div>
+                )}
             </div>
-            )}
+
+            {/* Expand Descendants (Right) */}
+            <button 
+                onClick={() => onToggleFamily(person.id, 'descendants')}
+                className={`absolute -right-5 bg-gray-800 text-gray-400 rounded-full hover:bg-amber-900 hover:text-amber-500 border border-gray-600 flex items-center justify-center transition-opacity z-30 ${isHovered ? 'opacity-100' : 'opacity-0'}`}
+                style={sideBtnStyle}
+                title="Expand Descendants"
+            >
+                 <Plus size={10 * scale} />
+            </button>
         </div>
 
         {/* Name Plate */}

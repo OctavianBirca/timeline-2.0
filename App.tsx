@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import Timeline from './components/Timeline';
 import Sidebar from './components/Sidebar';
 import TopBar from './components/TopBar';
@@ -9,311 +9,254 @@ import TitleDefinitionEditor from './components/TitleDefinitionEditor';
 import DynastyEditor from './components/DynastyEditor';
 import HistoricalGroupEditor from './components/HistoricalGroupEditor';
 import { 
-  PIXELS_PER_YEAR_DEFAULT,
-  MOCK_ENTITIES,
-  MOCK_PEOPLE,
-  MOCK_DYNASTIES,
-  MOCK_GROUPS,
-  MIN_YEAR,
-  MAX_YEAR,
-  PREDEFINED_TITLES
-} from './constants';
-import { 
-  ViewSettings, 
-  PoliticalEntity, 
-  Person, 
-  Dynasty,
-  CharacterRole,
-  TitleDefinition,
-  RankLevel,
-  HistoricalGroup
+  Person, PoliticalEntity, Dynasty, HistoricalGroup, TitleDefinition, ViewSettings, 
+  CharacterRole, RankLevel 
 } from './types';
+import { 
+  MOCK_PEOPLE, MOCK_ENTITIES, MOCK_DYNASTIES, MOCK_GROUPS, PREDEFINED_TITLES, 
+  PIXELS_PER_YEAR_DEFAULT, MIN_YEAR, MAX_YEAR 
+} from './constants';
 
 const App: React.FC = () => {
-  // --- Global State ---
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  // State
+  const [people, setPeople] = useState<Person[]>(MOCK_PEOPLE);
+  const [entities, setEntities] = useState<PoliticalEntity[]>(MOCK_ENTITIES);
+  const [dynasties, setDynasties] = useState<Dynasty[]>(MOCK_DYNASTIES);
+  const [groups, setGroups] = useState<HistoricalGroup[]>(MOCK_GROUPS);
+  const [titleDefinitions, setTitleDefinitions] = useState<TitleDefinition[]>(PREDEFINED_TITLES);
   
-  // Edit States
-  const [editingPerson, setEditingPerson] = useState<Person | null>(null);
-  const [editingEntity, setEditingEntity] = useState<PoliticalEntity | null>(null);
-  const [editingTitleDefinition, setEditingTitleDefinition] = useState<TitleDefinition | null>(null);
-  const [editingDynasty, setEditingDynasty] = useState<Dynasty | null>(null);
-  const [editingGroup, setEditingGroup] = useState<HistoricalGroup | null>(null);
-  
-  // View Settings State
-  const [viewSettings, setViewSettings] = useState<ViewSettings>({
+  const [settings, setViewSettings] = useState<ViewSettings>({
     zoom: PIXELS_PER_YEAR_DEFAULT,
     showLifespans: true,
     showSecondary: true,
-    showTertiary: true,
+    showTertiary: false,
     showGrid: true,
     showMarriages: true,
-    showParentalConnections: true
+    showParentalConnections: true,
+    forceVisibleIds: []
   });
 
-  // Data State
-  const [entities, setEntities] = useState<PoliticalEntity[]>(MOCK_ENTITIES);
-  const [dynasties, setDynasties] = useState<Dynasty[]>(MOCK_DYNASTIES);
-  const [people, setPeople] = useState<Person[]>(MOCK_PEOPLE);
-  const [titleDefinitions, setTitleDefinitions] = useState<TitleDefinition[]>(PREDEFINED_TITLES);
-  const [groups, setGroups] = useState<HistoricalGroup[]>(MOCK_GROUPS);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  // --- Handlers ---
-  const handleUpdateSetting = useCallback((key: keyof ViewSettings, value: any) => {
+  // Editors State
+  const [editingPersonId, setEditingPersonId] = useState<string | null>(null);
+  const [editingEntityId, setEditingEntityId] = useState<string | null>(null);
+  const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
+  const [editingDynastyId, setEditingDynastyId] = useState<string | null>(null);
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
+
+  // Helpers
+  const updateSetting = (key: keyof ViewSettings, value: any) => {
     setViewSettings(prev => ({ ...prev, [key]: value }));
-  }, []);
-
-  // --- Person Handling ---
-  const handleUpdatePerson = useCallback((updatedPerson: Person) => {
-      setPeople(prev => {
-        const exists = prev.some(p => p.id === updatedPerson.id);
-        if (exists) {
-            return prev.map(p => p.id === updatedPerson.id ? updatedPerson : p);
-        } else {
-            return [...prev, updatedPerson];
-        }
-      });
-  }, []);
-
-  const handleSavePerson = (updatedPerson: Person) => {
-    handleUpdatePerson(updatedPerson);
-    setEditingPerson(null);
   };
 
-  const handleEditPerson = (id: string) => {
+  const updatePerson = (updated: Person) => {
+    setPeople(prev => prev.map(p => p.id === updated.id ? updated : p));
+  };
+
+  const isPersonVisible = (p: Person) => {
+      if (p.isHidden) return false;
+      if (settings.forceVisibleIds && settings.forceVisibleIds.includes(p.id)) return true;
+      
+      // Determine effective role
+      let role = p.role;
+      if (p.titles.length > 0) {
+        if (p.titles.some(t => t.role === CharacterRole.NUCLEUS)) role = CharacterRole.NUCLEUS;
+        else if (p.titles.some(t => t.role === CharacterRole.SECONDARY)) role = CharacterRole.SECONDARY;
+        else if (p.titles.some(t => t.role === CharacterRole.TERTIARY)) role = CharacterRole.TERTIARY;
+      }
+
+      if (role === CharacterRole.NUCLEUS) return true;
+      if (role === CharacterRole.SECONDARY) return settings.showSecondary;
+      if (role === CharacterRole.TERTIARY) return settings.showTertiary;
+      return true;
+  };
+
+  // Logic provided in the snippet
+  const handleToggleFamily = (id: string, type: 'ancestors' | 'descendants' | 'spouses') => {
       const person = people.find(p => p.id === id);
-      if (person) setEditingPerson(person);
-  };
+      if (!person) return;
+      
+      let targetIds: string[] = [];
+      
+      if (type === 'spouses') {
+          const directSpouses = person.spouseIds || [];
+          const reverseSpouses = people
+            .filter(p => p.spouseIds && p.spouseIds.includes(id))
+            .map(p => p.id);
+          targetIds = Array.from(new Set([...directSpouses, ...reverseSpouses]));
 
-  // --- Entity Handling ---
-  const handleUpdateEntity = useCallback((updatedEntity: PoliticalEntity) => {
-    setEntities(prev => {
-      const exists = prev.some(e => e.id === updatedEntity.id);
-      if (exists) {
-        return prev.map(e => e.id === updatedEntity.id ? updatedEntity : e);
-      } else {
-        return [...prev, updatedEntity];
+      } else if (type === 'ancestors') {
+          if (person.fatherId) targetIds.push(person.fatherId);
+          if (person.motherId) targetIds.push(person.motherId);
+          if (person.adoptedParentId) targetIds.push(person.adoptedParentId);
+      } else if (type === 'descendants') {
+          targetIds = people.filter(p => p.fatherId === id || p.motherId === id).map(p => p.id);
       }
-    });
-  }, []);
+      
+      if (targetIds.length === 0) return;
 
-  const handleSaveEntity = (updatedEntity: PoliticalEntity) => {
-    handleUpdateEntity(updatedEntity);
-    setEditingEntity(null);
-  };
+      const targetPeople = people.filter(p => targetIds.includes(p.id));
+      const areAllVisible = targetPeople.length > 0 && targetPeople.every(p => isPersonVisible(p));
 
-  const handleEditEntity = (id: string) => {
-    const entity = entities.find(e => e.id === id);
-    if (entity) setEditingEntity(entity);
-  };
-
-  // --- Title Definition Handling ---
-  const handleUpdateTitleDefinition = useCallback((updatedDef: TitleDefinition) => {
-    setTitleDefinitions(prev => {
-      const exists = prev.some(t => t.id === updatedDef.id);
-      if (exists) {
-        return prev.map(t => t.id === updatedDef.id ? updatedDef : t);
+      if (areAllVisible) {
+          setPeople(prev => prev.map(p => targetIds.includes(p.id) ? { ...p, isHidden: true } : p));
+          setViewSettings(prev => ({
+              ...prev,
+              forceVisibleIds: prev.forceVisibleIds.filter(fid => !targetIds.includes(fid))
+          }));
       } else {
-        return [...prev, updatedDef];
+          setPeople(prev => prev.map(p => targetIds.includes(p.id) ? { ...p, isHidden: false } : p));
+          setViewSettings(prev => {
+              const current = prev.forceVisibleIds || [];
+              const newIds = [...current];
+              targetIds.forEach(tid => {
+                  if (!newIds.includes(tid)) newIds.push(tid);
+              });
+              return { ...prev, forceVisibleIds: newIds };
+          });
       }
-    });
-  }, []);
-
-  const handleSaveTitleDefinition = (updatedDef: TitleDefinition) => {
-    handleUpdateTitleDefinition(updatedDef);
-    setEditingTitleDefinition(null);
   };
 
-  const handleEditTitleDefinition = (id: string) => {
-      const def = titleDefinitions.find(t => t.id === id);
-      if (def) setEditingTitleDefinition(def);
-  };
-
-  // --- Dynasty Handling ---
-  const handleUpdateDynasty = useCallback((updatedDynasty: Dynasty) => {
-    setDynasties(prev => {
-      const exists = prev.some(d => d.id === updatedDynasty.id);
-      if (exists) {
-        return prev.map(d => d.id === updatedDynasty.id ? updatedDynasty : d);
-      } else {
-        return [...prev, updatedDynasty];
-      }
-    });
-  }, []);
-
-  const handleSaveDynasty = (updatedDynasty: Dynasty) => {
-    handleUpdateDynasty(updatedDynasty);
-    setEditingDynasty(null);
-  };
-
-  const handleEditDynasty = (id: string) => {
-      const dyn = dynasties.find(d => d.id === id);
-      if (dyn) setEditingDynasty(dyn);
-  };
-
-  // --- Historical Group Handling ---
-  const handleUpdateGroup = useCallback((updatedGroup: HistoricalGroup) => {
-    setGroups(prev => {
-      const exists = prev.some(g => g.id === updatedGroup.id);
-      if (exists) {
-        return prev.map(g => g.id === updatedGroup.id ? updatedGroup : g);
-      } else {
-        return [...prev, updatedGroup];
-      }
-    });
-  }, []);
-
-  const handleSaveGroup = (updatedGroup: HistoricalGroup) => {
-    handleUpdateGroup(updatedGroup);
-    setEditingGroup(null);
-  };
-
-  const handleEditGroup = (id: string) => {
-      const grp = groups.find(g => g.id === id);
-      if (grp) setEditingGroup(grp);
-  };
-
-
-  // --- Add New Handling ---
+  // Handlers for Add/Edit
   const handleAddNew = (type: string) => {
       if (type === 'people') {
           const newPerson: Person = {
-              id: `person_${Date.now()}`,
-              officialName: "New Character",
-              dynastyId: "",
+              id: `p_${Date.now()}`,
+              officialName: 'New Person',
+              dynastyId: '',
               birthYear: 700,
               deathYear: 750,
               spouseIds: [],
               titles: [],
               role: CharacterRole.SECONDARY,
-              verticalPosition: 0
+              verticalPosition: 0,
+              isHidden: false
           };
-          setEditingPerson(newPerson);
+          setPeople(prev => [...prev, newPerson]);
+          setEditingPersonId(newPerson.id);
       } else if (type === 'entities') {
           const newEntity: PoliticalEntity = {
-            id: `entity_${Date.now()}`,
-            name: "New Entity",
-            color: "rgba(100, 100, 100, 0.3)",
-            role: CharacterRole.SECONDARY,
-            heightIndex: entities.length,
-            periods: [{ startYear: 500, endYear: 600 }]
+              id: `e_${Date.now()}`,
+              name: 'New Entity',
+              color: 'rgba(100, 100, 100, 0.5)',
+              periods: [{ startYear: 700, endYear: 800 }],
+              role: CharacterRole.SECONDARY,
+              heightIndex: 0,
+              rowSpan: 1
           };
-          setEditingEntity(newEntity);
-      } else if (type === 'titles') {
-          const newTitleDef: TitleDefinition = {
-              id: `title_${Date.now()}`,
-              label: "New Title",
-              rank: RankLevel.COUNT
-          };
-          setEditingTitleDefinition(newTitleDef);
+          setEntities(prev => [...prev, newEntity]);
+          setEditingEntityId(newEntity.id);
       } else if (type === 'dynasties') {
           const newDynasty: Dynasty = {
-              id: `dynasty_${Date.now()}`,
-              name: "New Dynasty",
-              color: "#ffffff"
+              id: `d_${Date.now()}`,
+              name: 'New Dynasty',
+              color: '#cccccc'
           };
-          setEditingDynasty(newDynasty);
+          setDynasties(prev => [...prev, newDynasty]);
+          setEditingDynastyId(newDynasty.id);
+      } else if (type === 'titles') {
+         const newDef: TitleDefinition = {
+             id: `td_${Date.now()}`,
+             label: 'New Title',
+             rank: RankLevel.COUNT
+         };
+         setTitleDefinitions(prev => [...prev, newDef]);
+         setEditingTitleId(newDef.id);
       } else if (type === 'groups') {
           const newGroup: HistoricalGroup = {
-              id: `group_${Date.now()}`,
-              name: "New Historical Group"
+              id: `g_${Date.now()}`,
+              name: 'New Group'
           };
-          setEditingGroup(newGroup);
-      } else {
-          alert(`Adding new ${type} is not implemented in this demo.`);
+          setGroups(prev => [...prev, newGroup]);
+          setEditingGroupId(newGroup.id);
       }
   };
 
-  const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
-
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-gray-950 text-gray-200 font-sans selection:bg-amber-900 selection:text-white">
+    <div className="flex h-screen w-screen overflow-hidden bg-gray-950 text-white font-sans">
+      <TopBar 
+        settings={settings} 
+        updateSetting={updateSetting} 
+        people={people}
+        onUnhidePerson={(id) => updatePerson({...people.find(p => p.id === id)!, isHidden: false})}
+        onResetView={() => setViewSettings(prev => ({ ...prev, zoom: PIXELS_PER_YEAR_DEFAULT, forceVisibleIds: [] }))}
+      />
       
-      {/* Left Sidebar (Fixed width handled by component) */}
       <Sidebar 
-        isOpen={sidebarOpen} 
-        toggleSidebar={toggleSidebar}
+        isOpen={sidebarOpen}
+        toggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         entities={entities}
         people={people}
         dynasties={dynasties}
         titleDefinitions={titleDefinitions}
         groups={groups}
-        onSelectEntity={(id) => console.log("Selected", id)}
-        onEditPerson={handleEditPerson}
-        onEditEntity={handleEditEntity}
-        onEditTitle={handleEditTitleDefinition}
-        onEditDynasty={handleEditDynasty}
-        onEditGroup={handleEditGroup}
+        onSelectEntity={(id) => {}}
+        onEditPerson={setEditingPersonId}
+        onEditEntity={setEditingEntityId}
+        onEditTitle={setEditingTitleId}
+        onEditDynasty={setEditingDynastyId}
+        onEditGroup={setEditingGroupId}
         onAddNew={handleAddNew}
       />
 
-      {/* Main Content Layout */}
-      <div 
-        className={`flex-1 flex flex-col h-full transition-all duration-300 ease-in-out ${sidebarOpen ? 'ml-80' : 'ml-12'}`}
-      >
-        {/* Fixed Top Bar */}
-        <div className="h-14 w-full relative z-50">
-           <TopBar settings={viewSettings} updateSetting={handleUpdateSetting} />
-        </div>
-
-        {/* Scrollable Timeline Area Wrapper */}
-        <div className="flex-1 relative overflow-hidden bg-gray-900 shadow-inner"> 
-          <Timeline 
-             settings={viewSettings}
-             people={people}
-             entities={entities}
-             dynasties={dynasties}
-             minYear={MIN_YEAR}
-             maxYear={MAX_YEAR}
-             updatePerson={handleUpdatePerson}
-          />
-        </div>
+      <div className={`flex-1 relative transition-all duration-300 ${sidebarOpen ? 'ml-80' : 'ml-12'} mt-14`}>
+         <Timeline 
+            settings={settings}
+            people={people}
+            entities={entities}
+            dynasties={dynasties}
+            minYear={MIN_YEAR}
+            maxYear={MAX_YEAR}
+            updatePerson={updatePerson}
+            onToggleFamily={handleToggleFamily}
+         />
       </div>
 
-      {/* Editors */}
-      {editingPerson && (
-        <PersonEditor 
-          person={editingPerson}
-          allPeople={people}
-          dynasties={dynasties}
-          entities={entities}
-          titleDefinitions={titleDefinitions}
-          onSave={handleSavePerson}
-          onCancel={() => setEditingPerson(null)}
-        />
+      {/* Modals */}
+      {editingPersonId && (
+          <PersonEditor 
+            person={people.find(p => p.id === editingPersonId)!}
+            allPeople={people}
+            dynasties={dynasties}
+            entities={entities}
+            titleDefinitions={titleDefinitions}
+            onSave={(updated) => { updatePerson(updated); setEditingPersonId(null); }}
+            onCancel={() => setEditingPersonId(null)}
+          />
       )}
 
-      {editingEntity && (
-        <EntityEditor
-          entity={editingEntity}
-          allEntities={entities}
-          onSave={handleSaveEntity}
-          onCancel={() => setEditingEntity(null)}
-        />
+      {editingEntityId && (
+          <EntityEditor 
+             entity={entities.find(e => e.id === editingEntityId)!}
+             allEntities={entities}
+             onSave={(updated) => { setEntities(prev => prev.map(e => e.id === updated.id ? updated : e)); setEditingEntityId(null); }}
+             onCancel={() => setEditingEntityId(null)}
+          />
       )}
 
-      {editingTitleDefinition && (
-        <TitleDefinitionEditor 
-          titleDef={editingTitleDefinition}
-          onSave={handleSaveTitleDefinition}
-          onCancel={() => setEditingTitleDefinition(null)}
-        />
+      {editingTitleId && (
+          <TitleDefinitionEditor 
+            titleDef={titleDefinitions.find(t => t.id === editingTitleId)!}
+            onSave={(updated) => { setTitleDefinitions(prev => prev.map(t => t.id === updated.id ? updated : t)); setEditingTitleId(null); }}
+            onCancel={() => setEditingTitleId(null)}
+          />
       )}
 
-      {editingDynasty && (
-        <DynastyEditor 
-          dynasty={editingDynasty}
-          onSave={handleSaveDynasty}
-          onCancel={() => setEditingDynasty(null)}
-        />
+      {editingDynastyId && (
+          <DynastyEditor 
+            dynasty={dynasties.find(d => d.id === editingDynastyId)!}
+            onSave={(updated) => { setDynasties(prev => prev.map(d => d.id === updated.id ? updated : d)); setEditingDynastyId(null); }}
+            onCancel={() => setEditingDynastyId(null)}
+          />
       )}
-      
-      {editingGroup && (
-        <HistoricalGroupEditor 
-          group={editingGroup}
-          onSave={handleSaveGroup}
-          onCancel={() => setEditingGroup(null)}
-        />
+
+       {editingGroupId && (
+          <HistoricalGroupEditor 
+            group={groups.find(g => g.id === editingGroupId)!}
+            onSave={(updated) => { setGroups(prev => prev.map(g => g.id === updated.id ? updated : g)); setEditingGroupId(null); }}
+            onCancel={() => setEditingGroupId(null)}
+          />
       )}
 
     </div>
