@@ -25,6 +25,9 @@ const App: React.FC = () => {
   const [groups, setGroups] = useState<HistoricalGroup[]>(MOCK_GROUPS);
   const [titleDefinitions, setTitleDefinitions] = useState<TitleDefinition[]>(PREDEFINED_TITLES);
   
+  // Track currently selected context (default to first group)
+  const [activeGroupId, setActiveGroupId] = useState<string>(MOCK_GROUPS[0]?.id || "");
+  
   const [settings, setViewSettings] = useState<ViewSettings>({
     zoom: PIXELS_PER_YEAR_DEFAULT,
     showLifespans: true,
@@ -44,6 +47,10 @@ const App: React.FC = () => {
   const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
   const [editingDynastyId, setEditingDynastyId] = useState<string | null>(null);
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
+
+  // New person state (temporarily holds new person object before save)
+  const [editingPerson, setEditingPerson] = useState<Person | null>(null);
+  const [editingEntity, setEditingEntity] = useState<PoliticalEntity | null>(null);
 
   // Helpers
   const updateSetting = (key: keyof ViewSettings, value: any) => {
@@ -72,6 +79,16 @@ const App: React.FC = () => {
       return true;
   };
 
+  // Helper: Get effective role (duplicate logic for handleToggleFamily)
+  const getEffectiveRole = (p: Person): CharacterRole => {
+      if (p.titles.length > 0) {
+          if (p.titles.some(t => t.role === CharacterRole.NUCLEUS)) return CharacterRole.NUCLEUS;
+          if (p.titles.some(t => t.role === CharacterRole.SECONDARY)) return CharacterRole.SECONDARY;
+          if (p.titles.some(t => t.role === CharacterRole.TERTIARY)) return CharacterRole.TERTIARY;
+      }
+      return p.role;
+  };
+
   // Logic provided in the snippet
   const handleToggleFamily = (id: string, type: 'ancestors' | 'descendants' | 'spouses') => {
       const person = people.find(p => p.id === id);
@@ -80,6 +97,7 @@ const App: React.FC = () => {
       let targetIds: string[] = [];
       
       if (type === 'spouses') {
+          // Both direct spouseIds AND reverse spouseIds
           const directSpouses = person.spouseIds || [];
           const reverseSpouses = people
             .filter(p => p.spouseIds && p.spouseIds.includes(id))
@@ -97,24 +115,41 @@ const App: React.FC = () => {
       if (targetIds.length === 0) return;
 
       const targetPeople = people.filter(p => targetIds.includes(p.id));
-      const areAllVisible = targetPeople.length > 0 && targetPeople.every(p => isPersonVisible(p));
+
+      // Determine visibility status of targets
+      const visibleTargets = targetPeople.filter(p => isPersonVisible(p));
+      const areAllVisible = visibleTargets.length === targetPeople.length;
 
       if (areAllVisible) {
+          // HIDE ALL
           setPeople(prev => prev.map(p => targetIds.includes(p.id) ? { ...p, isHidden: true } : p));
           setViewSettings(prev => ({
               ...prev,
               forceVisibleIds: prev.forceVisibleIds.filter(fid => !targetIds.includes(fid))
           }));
       } else {
+          // SHOW ALL
+          // 1. Unhide them
           setPeople(prev => prev.map(p => targetIds.includes(p.id) ? { ...p, isHidden: false } : p));
-          setViewSettings(prev => {
-              const current = prev.forceVisibleIds || [];
-              const newIds = [...current];
-              targetIds.forEach(tid => {
-                  if (!newIds.includes(tid)) newIds.push(tid);
+          
+          // 2. Force visibility if they are typically hidden by role filters
+          const idsToForce = targetPeople.filter(p => {
+               const role = getEffectiveRole(p);
+               if (role === CharacterRole.SECONDARY && !settings.showSecondary) return true;
+               if (role === CharacterRole.TERTIARY && !settings.showTertiary) return true;
+               return false;
+          }).map(p => p.id);
+
+          if (idsToForce.length > 0) {
+              setViewSettings(prev => {
+                  const current = prev.forceVisibleIds || [];
+                  const newIds = [...current];
+                  idsToForce.forEach(tid => {
+                      if (!newIds.includes(tid)) newIds.push(tid);
+                  });
+                  return { ...prev, forceVisibleIds: newIds };
               });
-              return { ...prev, forceVisibleIds: newIds };
-          });
+          }
       }
   };
 
@@ -133,20 +168,23 @@ const App: React.FC = () => {
               verticalPosition: 0,
               isHidden: false
           };
-          setPeople(prev => [...prev, newPerson]);
-          setEditingPersonId(newPerson.id);
+          setEditingPerson(newPerson);
       } else if (type === 'entities') {
           const newEntity: PoliticalEntity = {
               id: `e_${Date.now()}`,
               name: 'New Entity',
-              color: 'rgba(100, 100, 100, 0.5)',
-              periods: [{ startYear: 700, endYear: 800 }],
-              role: CharacterRole.SECONDARY,
-              heightIndex: 0,
-              rowSpan: 1
+              periods: [
+                  { 
+                      id: `ep_${Date.now()}`,
+                      startYear: 700, 
+                      endYear: 800, 
+                      color: 'rgba(100,100,100,0.5)', 
+                      contexts: [], 
+                      vassalage: [] 
+                  }
+              ]
           };
-          setEntities(prev => [...prev, newEntity]);
-          setEditingEntityId(newEntity.id);
+          setEditingEntity(newEntity);
       } else if (type === 'dynasties') {
           const newDynasty: Dynasty = {
               id: `d_${Date.now()}`,
@@ -173,6 +211,40 @@ const App: React.FC = () => {
       }
   };
 
+  const handleEditPerson = (id: string) => {
+      const p = people.find(person => person.id === id);
+      if (p) setEditingPerson({ ...p });
+  };
+
+  const handleSavePerson = (personToSave: Person) => {
+      setPeople(prev => {
+          const exists = prev.some(p => p.id === personToSave.id);
+          if (exists) {
+              return prev.map(p => p.id === personToSave.id ? personToSave : p);
+          } else {
+              return [...prev, personToSave];
+          }
+      });
+      setEditingPerson(null);
+  };
+
+  const handleEditEntity = (id: string) => {
+      const e = entities.find(entity => entity.id === id);
+      if (e) setEditingEntity({ ...e });
+  };
+
+  const handleSaveEntity = (entityToSave: PoliticalEntity) => {
+      setEntities(prev => {
+          const exists = prev.some(e => e.id === entityToSave.id);
+          if (exists) {
+              return prev.map(e => e.id === entityToSave.id ? entityToSave : e);
+          } else {
+              return [...prev, entityToSave];
+          }
+      });
+      setEditingEntity(null);
+  };
+
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-gray-950 text-white font-sans">
       <TopBar 
@@ -191,9 +263,11 @@ const App: React.FC = () => {
         dynasties={dynasties}
         titleDefinitions={titleDefinitions}
         groups={groups}
+        activeGroupId={activeGroupId}
+        onSelectGroup={setActiveGroupId}
         onSelectEntity={(id) => {}}
-        onEditPerson={setEditingPersonId}
-        onEditEntity={setEditingEntityId}
+        onEditPerson={handleEditPerson}
+        onEditEntity={handleEditEntity}
         onEditTitle={setEditingTitleId}
         onEditDynasty={setEditingDynastyId}
         onEditGroup={setEditingGroupId}
@@ -208,30 +282,32 @@ const App: React.FC = () => {
             dynasties={dynasties}
             minYear={MIN_YEAR}
             maxYear={MAX_YEAR}
+            activeGroupId={activeGroupId}
             updatePerson={updatePerson}
             onToggleFamily={handleToggleFamily}
          />
       </div>
 
       {/* Modals */}
-      {editingPersonId && (
+      {editingPerson && (
           <PersonEditor 
-            person={people.find(p => p.id === editingPersonId)!}
+            person={editingPerson}
             allPeople={people}
             dynasties={dynasties}
             entities={entities}
             titleDefinitions={titleDefinitions}
-            onSave={(updated) => { updatePerson(updated); setEditingPersonId(null); }}
-            onCancel={() => setEditingPersonId(null)}
+            onSave={handleSavePerson}
+            onCancel={() => setEditingPerson(null)}
           />
       )}
 
-      {editingEntityId && (
+      {editingEntity && (
           <EntityEditor 
-             entity={entities.find(e => e.id === editingEntityId)!}
+             entity={editingEntity}
              allEntities={entities}
-             onSave={(updated) => { setEntities(prev => prev.map(e => e.id === updated.id ? updated : e)); setEditingEntityId(null); }}
-             onCancel={() => setEditingEntityId(null)}
+             groups={groups}
+             onSave={handleSaveEntity}
+             onCancel={() => setEditingEntity(null)}
           />
       )}
 

@@ -4,7 +4,7 @@ import { CharacterRole, Dynasty, Person, PoliticalEntity, RankLevel, HistoricalG
 export const PIXELS_PER_YEAR_DEFAULT = 10;
 export const MIN_YEAR = 450;
 export const MAX_YEAR = 850;
-export const SLOT_HEIGHT = 140; // Height of one horizontal "lane"
+export const SLOT_HEIGHT = 140; 
 
 export const LABELS = {
   en: {
@@ -47,11 +47,9 @@ export const MONTHS = [
   { value: 12, label: 'Dec' },
 ];
 
-// --- PREDEFINED DATA ---
-
 export const PREDEFINED_TITLES = [
   { id: 'pope', label: 'Pope', rank: RankLevel.POPE },
-  { id: 'patriarch', label: 'Patriarch', rank: RankLevel.POPE }, // Rank 0
+  { id: 'patriarch', label: 'Patriarch', rank: RankLevel.POPE }, 
   { id: 'emperor', label: 'Emperor', rank: RankLevel.EMPEROR },
   { id: 'king', label: 'King', rank: RankLevel.KING },
   { id: 'queen', label: 'Queen', rank: RankLevel.KING },
@@ -63,8 +61,6 @@ export const PREDEFINED_TITLES = [
   { id: 'peasant', label: 'Peasant', rank: RankLevel.PEASANT },
 ];
 
-// --- MOCK DATA ---
-
 export const MOCK_GROUPS: HistoricalGroup[] = [
   { id: 'g1', name: 'History of France', description: 'From Merovingians to Napoleon' },
   { id: 'g2', name: 'History of Rome', description: 'The Rise and Fall' },
@@ -72,38 +68,62 @@ export const MOCK_GROUPS: HistoricalGroup[] = [
 ];
 
 export const MOCK_DYNASTIES: Dynasty[] = [
-  { id: 'merovingian', name: 'Merovingian', color: '#10b981' }, // Emerald
-  { id: 'carolingian', name: 'Carolingian', color: '#ef4444' }, // Red
-  { id: 'pippinids', name: 'Pippinids', color: '#f97316' }, // Orange
+  { id: 'merovingian', name: 'Merovingian', color: '#10b981' }, 
+  { id: 'carolingian', name: 'Carolingian', color: '#ef4444' }, 
+  { id: 'pippinids', name: 'Pippinids', color: '#f97316' }, 
 ];
 
 export const MOCK_ENTITIES: PoliticalEntity[] = [
   {
     id: 'kingdom_franks',
     name: 'Kingdom of the Franks',
-    color: 'rgba(16, 185, 129, 0.2)', // Light green opacity
-    role: CharacterRole.NUCLEUS,
-    heightIndex: 0,
-    rowSpan: 1,
-    periods: [{ startYear: 481, endYear: 843 }]
+    periods: [
+      {
+        id: 'p_kf_1',
+        startYear: 481,
+        endYear: 843,
+        color: 'rgba(16, 185, 129, 0.2)',
+        contexts: [
+          { groupId: 'g1', role: CharacterRole.NUCLEUS, heightIndex: 0, rowSpan: 1 }
+        ],
+        vassalage: []
+      }
+    ]
   },
   {
     id: 'kingdom_neustria',
     name: 'Kingdom of Neustria',
-    color: 'rgba(59, 130, 246, 0.2)', // Blue
-    role: CharacterRole.SECONDARY,
-    heightIndex: 2, // Lower down
-    rowSpan: 1,
-    periods: [{ startYear: 511, endYear: 751, isVassalTo: 'kingdom_franks' }]
+    periods: [
+      {
+        id: 'p_kn_1',
+        startYear: 511,
+        endYear: 751,
+        color: 'rgba(59, 130, 246, 0.2)',
+        contexts: [
+          { groupId: 'g1', role: CharacterRole.SECONDARY, heightIndex: 2, rowSpan: 1 }
+        ],
+        vassalage: [
+           { startYear: 511, endYear: 751, liegeId: 'kingdom_franks' }
+        ]
+      }
+    ]
   },
   {
     id: 'hre',
     name: 'Holy Roman Empire',
-    color: 'rgba(239, 68, 68, 0.2)', // Red
-    role: CharacterRole.NUCLEUS,
-    heightIndex: 0,
-    rowSpan: 1,
-    periods: [{ startYear: 800, endYear: 840 }]
+    periods: [
+      {
+        id: 'p_hre_1',
+        startYear: 800,
+        endYear: 840,
+        color: 'rgba(239, 68, 68, 0.2)',
+        contexts: [
+           { groupId: 'g3', role: CharacterRole.NUCLEUS, heightIndex: 0, rowSpan: 1 },
+           { groupId: 'g1', role: CharacterRole.SECONDARY, heightIndex: 4, rowSpan: 1 }
+        ],
+        vassalage: []
+      }
+    ]
   }
 ];
 

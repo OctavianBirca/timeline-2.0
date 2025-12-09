@@ -24,22 +24,22 @@ export enum RankLevel {
 
 export interface TitlePeriod {
   startYear: number;
-  startMonth?: number; // 1-12
-  startDay?: number; // 1-31
+  startMonth?: number; 
+  startDay?: number; 
   endYear: number;
   endMonth?: number;
   endDay?: number;
-  isHidden?: boolean; // If true, hides the date text in the visualization
+  isHidden?: boolean; 
 }
 
 export interface Title {
   id: string;
-  name: string; // e.g., "King of Franks"
+  name: string; 
   entityId: string;
   rank: RankLevel;
-  role: CharacterRole; // NUCLEUS or SECONDARY relative to this entity
+  role: CharacterRole; 
   periods: TitlePeriod[];
-  positionIndex: number; // For vertical stacking within a character card
+  positionIndex: number; 
 }
 
 export interface TitleDefinition {
@@ -48,21 +48,37 @@ export interface TitleDefinition {
   rank: RankLevel;
 }
 
-export interface EntityPeriod {
+// --- NEW ENTITY STRUCTURE ---
+
+export interface EntityContextRole {
+  groupId: string; // The Historical Group this configuration applies to
+  role: CharacterRole;
+  heightIndex: number;
+  rowSpan: number;
+}
+
+export interface EntityVassalage {
   startYear: number;
   endYear: number;
-  isVassalTo?: string; // Entity ID of the liege
+  liegeId: string; // Entity ID of the liege
+}
+
+export interface EntityPeriod {
+  id: string; // Unique ID for keying
+  startYear: number;
+  endYear: number;
+  color: string;
+  contexts: EntityContextRole[]; // How this period appears in different history groups
+  vassalage: EntityVassalage[];
 }
 
 export interface PoliticalEntity {
   id: string;
   name: string;
-  color: string;
   periods: EntityPeriod[];
-  role: CharacterRole; // Is this a nucleus entity for the current view?
-  heightIndex: number; // Vertical slot allocation
-  rowSpan: number; // How many vertical layers this entity occupies
 }
+
+// ---------------------------
 
 export interface Dynasty {
   id: string;
@@ -98,21 +114,20 @@ export interface Person {
   titles: Title[];
   imageUrl?: string;
   role: CharacterRole; // Fallback role if no titles
-  verticalPosition: number; // User adjustable vertical slot
+  verticalPosition: number; 
   isHidden?: boolean;
-  color?: string; // Optional override for dynasty color
+  color?: string; 
 }
 
-// Configuration State
 export interface ViewSettings {
-  zoom: number; // Pixels per year
+  zoom: number; 
   showLifespans: boolean;
-  showSecondary: boolean; // Controls SECONDARY role
-  showTertiary: boolean;  // Controls TERTIARY role
+  showSecondary: boolean; 
+  showTertiary: boolean; 
   showGrid: boolean;
   showMarriages: boolean;
   showParentalConnections: boolean;
-  forceVisibleIds: string[]; // List of IDs to show regardless of role settings
+  forceVisibleIds: string[]; 
 }
 
 export interface LanguageDictionary {

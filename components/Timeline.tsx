@@ -1,6 +1,6 @@
 
 import React, { useMemo, useRef } from 'react';
-import { Person, PoliticalEntity, ViewSettings, Dynasty, CharacterRole } from '../types';
+import { Person, PoliticalEntity, ViewSettings, Dynasty, CharacterRole, HistoricalGroup } from '../types';
 import CharacterNode from './CharacterNode';
 
 interface TimelineProps {
@@ -10,6 +10,7 @@ interface TimelineProps {
   dynasties: Dynasty[];
   minYear: number;
   maxYear: number;
+  activeGroupId: string;
   updatePerson: (person: Person) => void;
   onToggleFamily: (id: string, type: 'ancestors' | 'descendants' | 'spouses') => void;
 }
@@ -21,6 +22,7 @@ const Timeline: React.FC<TimelineProps> = ({
   dynasties,
   minYear,
   maxYear,
+  activeGroupId,
   updatePerson,
   onToggleFamily
 }) => {
@@ -49,8 +51,32 @@ const Timeline: React.FC<TimelineProps> = ({
   const totalWidth = Math.max(totalYears * settings.zoom, 1000); 
   const yearToX = (year: number) => (year - minYear) * settings.zoom;
 
-  // --- Height Calculation ---
-  const maxEntityIndex = useMemo(() => Math.max(0, ...entities.map(e => (e.heightIndex + (e.rowSpan || 1) - 1))), [entities]);
+  // --- Entities & Layout Calculation relative to Active Group ---
+  
+  // Flatten periods that are relevant to the active context
+  const activePeriods = useMemo(() => {
+     const flat = [];
+     for(const entity of entities) {
+        for(const period of entity.periods) {
+            const context = period.contexts.find(c => c.groupId === activeGroupId);
+            if(context) {
+                flat.push({
+                    entityId: entity.id,
+                    name: entity.name,
+                    periodId: period.id,
+                    startYear: period.startYear,
+                    endYear: period.endYear,
+                    color: period.color,
+                    vassalage: period.vassalage,
+                    ...context // adds role, heightIndex, rowSpan
+                });
+            }
+        }
+     }
+     return flat;
+  }, [entities, activeGroupId]);
+
+  const maxEntityIndex = useMemo(() => Math.max(0, ...activePeriods.map(p => (p.heightIndex + (p.rowSpan || 1) - 1))), [activePeriods]);
   const maxPersonIndex = useMemo(() => Math.max(0, ...people.filter(p => !p.isHidden).map(p => p.verticalPosition)), [people]);
 
   const contentHeight = Math.max(
@@ -106,19 +132,14 @@ const Timeline: React.FC<TimelineProps> = ({
   // --- Filter visible people ---
   const visiblePeople = useMemo(() => {
     return people.filter(p => {
-      // 1. Manually Hidden overrides everything (unless unhidden via top bar)
       if (p.isHidden) return false;
-      
-      // 2. Forced Visible (e.g., expanded spouse) overrides Role Filters
       if (settings.forceVisibleIds && settings.forceVisibleIds.includes(p.id)) return true;
       
       const role = getEffectiveRole(p);
-      
-      if (role === CharacterRole.NUCLEUS) return true; // Nucleus is always shown
+      if (role === CharacterRole.NUCLEUS) return true;
       if (role === CharacterRole.SECONDARY) return settings.showSecondary;
       if (role === CharacterRole.TERTIARY) return settings.showTertiary;
-      
-      return true; // Fallback
+      return true;
     });
   }, [people, settings.showSecondary, settings.showTertiary, settings.forceVisibleIds]);
 
@@ -183,6 +204,7 @@ const Timeline: React.FC<TimelineProps> = ({
 
       // Parent -> Child (Father AND Mother)
       if (settings.showParentalConnections) {
+        // Draw Mother first (bottom layer), then Father (top layer)
         const parents = [
             { id: person.motherId, type: 'mother' },
             { id: person.fatherId, type: 'father' }
@@ -374,42 +396,64 @@ const Timeline: React.FC<TimelineProps> = ({
                   </div>
                 )}
 
-                {/* Entities */}
+                {/* Entities (Active Context Only) */}
                 <div className="absolute inset-0 z-10 pointer-events-none">
-                  {entities.map((entity, i) => (
-                    entity.periods.map((period, idx) => {
+                  {activePeriods.map((period, i) => {
                       const x = yearToX(period.startYear);
                       const w = yearToX(period.endYear) - x;
-                      const isVassal = !!period.isVassalTo;
-                      const y = getEntityY(entity.heightIndex);
-                      const rowSpan = entity.rowSpan || 1;
+                      const y = getEntityY(period.heightIndex);
+                      const rowSpan = period.rowSpan || 1;
                       const height = (ENTITY_LAYER_HEIGHT * rowSpan) - (40 * globalScale);
+
+                      // Only show text if wide enough to be readable
+                      const showText = w > 60;
 
                       return (
                         <div
-                          key={`${entity.id}-${idx}`}
-                          className={`absolute rounded-md flex flex-col justify-center text-white/40 font-bold uppercase tracking-widest text-lg overflow-hidden ${isVassal ? 'pattern-diagonal-lines' : ''}`}
+                          key={`${period.entityId}-${period.periodId}-${i}`}
+                          title={`${period.name} (${period.startYear} - ${period.endYear})`}
+                          className={`absolute rounded-md flex flex-col justify-center text-white/40 font-bold uppercase tracking-widest text-lg overflow-hidden pointer-events-auto hover:bg-white/5 transition-colors`}
                           style={{
                             left: x,
                             width: w,
                             top: y,
                             height: height,
-                            backgroundColor: entity.color,
-                            border: isVassal ? '1px dashed rgba(255,255,255,0.2)' : '1px solid rgba(255,255,255,0.05)',
+                            backgroundColor: period.color,
+                            border: '1px solid rgba(255,255,255,0.05)',
                             fontSize: `${18 * globalScale}px`,
                             alignItems: 'center'
                           }}
                         >
-                          {!isVassal && (
-                            <div className="sticky left-1/2 -translate-x-1/2 flex flex-col items-center text-center max-w-[95%] py-2">
-                                <span className="whitespace-normal leading-tight">{entity.name}</span>
+                          {/* Main Entity Block Content */}
+                          {showText && (
+                            <div className="sticky left-1/2 -translate-x-1/2 flex flex-col items-center text-center max-w-[95%] py-2 z-10">
+                                <span className="whitespace-normal leading-tight">{period.name}</span>
                                 <span className="text-[0.7em] opacity-70 whitespace-nowrap mt-1">{period.startYear} – {period.endYear}</span>
                             </div>
                           )}
+                          
+                          {/* Vassalage Overlays */}
+                          {period.vassalage && period.vassalage.map((vassal, vIdx) => {
+                              // Ensure vassal period is within main period
+                              const vStart = Math.max(vassal.startYear, period.startYear);
+                              const vEnd = Math.min(vassal.endYear, period.endYear);
+                              if(vStart >= vEnd) return null;
+                              
+                              const vx = (vStart - period.startYear) * settings.zoom;
+                              const vw = (vEnd - vStart) * settings.zoom;
+                              
+                              return (
+                                  <div 
+                                    key={`vas-${vIdx}`}
+                                    className="absolute top-0 bottom-0 pattern-diagonal-lines border-x border-white/20"
+                                    style={{ left: vx, width: vw }}
+                                    title={`Vassal to ${entities.find(e => e.id === vassal.liegeId)?.name || 'Unknown'}`}
+                                  />
+                              );
+                          })}
                         </div>
-                      )
-                    })
-                  ))}
+                      );
+                  })}
                 </div>
 
                 {/* SVG Connections */}

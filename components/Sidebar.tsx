@@ -1,8 +1,8 @@
+
 import React, { useState, useMemo } from 'react';
 import { Menu, X, Settings, Users, BookOpen, Crown, Flag, Layers, Search, FolderTree } from 'lucide-react';
 import { PoliticalEntity, Person, Dynasty, TitleDefinition, HistoricalGroup } from '../types';
 import { LABELS } from '../constants';
-import { RankLevel } from '../types';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -12,6 +12,8 @@ interface SidebarProps {
   dynasties: Dynasty[];
   titleDefinitions: TitleDefinition[];
   groups: HistoricalGroup[];
+  activeGroupId: string;
+  onSelectGroup: (id: string) => void;
   onSelectEntity: (id: string) => void;
   onEditPerson: (id: string) => void;
   onEditEntity: (id: string) => void;
@@ -31,6 +33,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   dynasties,
   titleDefinitions,
   groups,
+  activeGroupId,
+  onSelectGroup,
   onSelectEntity,
   onEditPerson,
   onEditEntity,
@@ -63,7 +67,6 @@ const Sidebar: React.FC<SidebarProps> = ({
           d.name.toLowerCase().includes(lowerFilter)
         );
       case 'titles':
-        // Show defined Titles (Types)
         return titleDefinitions.filter(t => 
            t.label.toLowerCase().includes(lowerFilter)
         );
@@ -111,12 +114,19 @@ const Sidebar: React.FC<SidebarProps> = ({
                     <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
                         <h3 className="text-xs uppercase text-gray-500 font-semibold mb-3 tracking-wider">Select Context</h3>
                         <div className="space-y-2">
-                            <button className="w-full text-left px-3 py-2 bg-gray-800/50 hover:bg-gray-800 rounded border border-gray-700 text-sm flex items-center gap-2">
-                                <Flag size={14} className="text-blue-400" /> History of France
-                            </button>
-                            <button className="w-full text-left px-3 py-2 hover:bg-gray-800 rounded border border-transparent text-sm text-gray-400 flex items-center gap-2">
-                                <Flag size={14} /> Roman Empire
-                            </button>
+                            {groups.map(g => (
+                                <button 
+                                    key={g.id}
+                                    onClick={() => onSelectGroup(g.id)}
+                                    className={`w-full text-left px-3 py-2 rounded border text-sm flex items-center gap-2 transition-colors ${activeGroupId === g.id ? 'bg-amber-900/30 border-amber-600 text-amber-500' : 'bg-gray-800/50 hover:bg-gray-800 border-gray-700 text-gray-400'}`}
+                                >
+                                    <Flag size={14} className={activeGroupId === g.id ? "text-amber-500" : "text-gray-500"} /> 
+                                    {g.name}
+                                </button>
+                            ))}
+                        </div>
+                        <div className="mt-8 p-4 bg-gray-800/30 rounded border border-gray-800 text-xs text-gray-500 italic">
+                             Entities shown on the timeline are filtered based on the selected historical group context.
                         </div>
                     </div>
                 ) : (
@@ -183,10 +193,12 @@ const Sidebar: React.FC<SidebarProps> = ({
 
                                 {adminTab === 'entities' && filteredData.map((e: any) => (
                                     <div key={e.id} className="flex items-center gap-3 p-2 hover:bg-gray-800/50 rounded cursor-pointer group">
-                                        <div className="w-4 h-4 rounded-full shrink-0 border border-white/10" style={{ backgroundColor: e.color }}></div>
+                                        <div className="w-4 h-4 rounded shrink-0 border border-white/10 flex items-center justify-center text-[8px] font-mono text-gray-500">
+                                            {e.periods.length}
+                                        </div>
                                         <div className="flex-1 min-w-0">
                                             <div className="text-sm font-medium text-gray-200 truncate">{e.name}</div>
-                                            <div className="text-xs text-gray-500 truncate">{e.id}</div>
+                                            <div className="text-xs text-gray-500 truncate">{e.periods.length} period(s)</div>
                                         </div>
                                          <button 
                                             onClick={(evt) => { evt.stopPropagation(); onEditEntity(e.id); }}

@@ -89,6 +89,11 @@ const CharacterNode: React.FC<CharacterNodeProps> = ({
       e.dataTransfer.setData("text/plain", person.id);
   };
 
+  // Sort titles by positionIndex for correct vertical stacking
+  const sortedTitles = useMemo(() => {
+      return [...person.titles].sort((a, b) => (a.positionIndex || 0) - (b.positionIndex || 0));
+  }, [person.titles]);
+
   // Layout calculations based on scale
   const lifespanTopOffset = imageSize + (4 * scale);
   const namePlateWidth = 200 * scale;
@@ -270,7 +275,7 @@ const CharacterNode: React.FC<CharacterNodeProps> = ({
         className="flex flex-col w-full relative z-30 items-start"
         style={{ marginTop: `${4 * scale}px` }}
       >
-        {person.titles.map((title) => {
+        {sortedTitles.map((title) => {
           const entity = getEntity(title.entityId);
           // Determine the range of the whole Title (from min start to max end) to define the track
           if (title.periods.length === 0) return null;
@@ -281,8 +286,8 @@ const CharacterNode: React.FC<CharacterNodeProps> = ({
           const trackLeft = (minStart - person.birthYear) * settings.zoom;
           const trackWidth = (maxEnd - minStart) * settings.zoom;
           
-          const bgColor = entity?.color ? entity.color.replace(/[\d.]+\)$/g, '0.8)') : 'rgba(127, 29, 29, 0.8)';
-          const borderColor = entity?.color ? entity.color.replace(/[\d.]+\)$/g, '1)') : 'rgba(153, 27, 27, 1)';
+          const bgColor = entity?.periods[0]?.color ? entity.periods[0].color.replace(/[\d.]+\)$/g, '0.8)') : 'rgba(127, 29, 29, 0.8)';
+          const borderColor = entity?.periods[0]?.color ? entity.periods[0].color.replace(/[\d.]+\)$/g, '1)') : 'rgba(153, 27, 27, 1)';
 
           return (
             <div 
