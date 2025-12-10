@@ -25,8 +25,11 @@ const App: React.FC = () => {
   const [groups, setGroups] = useState<HistoricalGroup[]>(MOCK_GROUPS);
   const [titleDefinitions, setTitleDefinitions] = useState<TitleDefinition[]>(PREDEFINED_TITLES);
   
-  // Track currently selected context (default to first group)
-  const [activeGroupId, setActiveGroupId] = useState<string>(MOCK_GROUPS[0]?.id || "");
+  // Track currently selected contexts (Multi-select)
+  const [activeGroupIds, setActiveGroupIds] = useState<string[]>(MOCK_GROUPS.length > 0 ? [MOCK_GROUPS[0].id] : []);
+  
+  // Track hidden entities (Sidebar toggles)
+  const [hiddenEntityIds, setHiddenEntityIds] = useState<string[]>([]);
   
   const [settings, setViewSettings] = useState<ViewSettings>({
     zoom: PIXELS_PER_YEAR_DEFAULT,
@@ -263,8 +266,12 @@ const App: React.FC = () => {
         dynasties={dynasties}
         titleDefinitions={titleDefinitions}
         groups={groups}
-        activeGroupId={activeGroupId}
-        onSelectGroup={setActiveGroupId}
+        activeGroupIds={activeGroupIds}
+        hiddenEntityIds={hiddenEntityIds}
+        onUpdateActiveGroups={setActiveGroupIds}
+        onToggleEntityVisibility={(id) => {
+            setHiddenEntityIds(prev => prev.includes(id) ? prev.filter(hid => hid !== id) : [...prev, id]);
+        }}
         onSelectEntity={(id) => {}}
         onEditPerson={handleEditPerson}
         onEditEntity={handleEditEntity}
@@ -282,7 +289,8 @@ const App: React.FC = () => {
             dynasties={dynasties}
             minYear={MIN_YEAR}
             maxYear={MAX_YEAR}
-            activeGroupId={activeGroupId}
+            activeGroupIds={activeGroupIds}
+            hiddenEntityIds={hiddenEntityIds}
             updatePerson={updatePerson}
             onToggleFamily={handleToggleFamily}
          />
@@ -306,6 +314,7 @@ const App: React.FC = () => {
              entity={editingEntity}
              allEntities={entities}
              groups={groups}
+             activeGroupId={activeGroupIds[0]} // Pass the first active group as default context
              onSave={handleSaveEntity}
              onCancel={() => setEditingEntity(null)}
           />

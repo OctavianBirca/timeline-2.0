@@ -1,7 +1,7 @@
 
-import React, { useState, useMemo } from 'react';
-import { Menu, X, Settings, Users, BookOpen, Crown, Flag, Layers, Search, FolderTree } from 'lucide-react';
-import { PoliticalEntity, Person, Dynasty, TitleDefinition, HistoricalGroup } from '../types';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { Menu, X, Settings, Users, BookOpen, Crown, Flag, Layers, Search, FolderTree, ChevronDown, Check, Eye, EyeOff } from 'lucide-react';
+import { PoliticalEntity, Person, Dynasty, TitleDefinition, HistoricalGroup, CharacterRole } from '../types';
 import { LABELS } from '../constants';
 
 interface SidebarProps {
@@ -12,8 +12,10 @@ interface SidebarProps {
   dynasties: Dynasty[];
   titleDefinitions: TitleDefinition[];
   groups: HistoricalGroup[];
-  activeGroupId: string;
-  onSelectGroup: (id: string) => void;
+  activeGroupIds: string[];
+  hiddenEntityIds: string[];
+  onUpdateActiveGroups: (ids: string[]) => void;
+  onToggleEntityVisibility: (id: string) => void;
   onSelectEntity: (id: string) => void;
   onEditPerson: (id: string) => void;
   onEditEntity: (id: string) => void;
@@ -33,8 +35,10 @@ const Sidebar: React.FC<SidebarProps> = ({
   dynasties,
   titleDefinitions,
   groups,
-  activeGroupId,
-  onSelectGroup,
+  activeGroupIds,
+  hiddenEntityIds,
+  onUpdateActiveGroups,
+  onToggleEntityVisibility,
   onSelectEntity,
   onEditPerson,
   onEditEntity,
@@ -46,6 +50,19 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [activeTab, setActiveTab] = useState<'history' | 'admin'>('history');
   const [adminTab, setAdminTab] = useState<AdminTab>('people');
   const [filterText, setFilterText] = useState('');
+  const [isGroupDropdownOpen, setIsGroupDropdownOpen] = useState(false);
+  const groupDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (groupDropdownRef.current && !groupDropdownRef.current.contains(event.target as Node)) {
+        setIsGroupDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // --- Filter Logic ---
   const filteredData = useMemo(() => {
@@ -78,6 +95,45 @@ const Sidebar: React.FC<SidebarProps> = ({
         return [];
     }
   }, [adminTab, filterText, people, entities, dynasties, titleDefinitions, groups]);
+
+  // --- Entity Categorization for History Tab ---
+  const { nucleusEntities, secondaryEntities } = useMemo(() => {
+      const nucleus: PoliticalEntity[] = [];
+      const secondary: PoliticalEntity[] = [];
+
+      entities.forEach(entity => {
+          let role: CharacterRole | null = null;
+          
+          // Check periods to see if this entity is active in any of the selected groups
+          entity.periods.forEach(period => {
+              period.contexts.forEach(ctx => {
+                  if (activeGroupIds.includes(ctx.groupId)) {
+                      // If it's Nucleus in ANY selected context, it upgrades to Nucleus
+                      if (ctx.role === CharacterRole.NUCLEUS) {
+                          role = CharacterRole.NUCLEUS;
+                      } else if (role !== CharacterRole.NUCLEUS) {
+                          role = CharacterRole.SECONDARY;
+                      }
+                  }
+              });
+          });
+
+          if (role === CharacterRole.NUCLEUS) nucleus.push(entity);
+          else if (role === CharacterRole.SECONDARY) secondary.push(entity);
+      });
+
+      return { nucleusEntities: nucleus, secondaryEntities: secondary };
+  }, [entities, activeGroupIds]);
+
+  const toggleGroupSelection = (id: string) => {
+      if (activeGroupIds.includes(id)) {
+          // Prevent deselecting the last one if you want to enforce at least one, 
+          // but allowing 0 is also fine to clear view. Let's allow 0.
+          onUpdateActiveGroups(activeGroupIds.filter(gid => gid !== id));
+      } else {
+          onUpdateActiveGroups([...activeGroupIds, id]);
+      }
+  };
 
   return (
     <div 
@@ -112,22 +168,107 @@ const Sidebar: React.FC<SidebarProps> = ({
                 {activeTab === 'history' ? (
                     // History Tab Content
                     <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-                        <h3 className="text-xs uppercase text-gray-500 font-semibold mb-3 tracking-wider">Select Context</h3>
-                        <div className="space-y-2">
-                            {groups.map(g => (
-                                <button 
-                                    key={g.id}
-                                    onClick={() => onSelectGroup(g.id)}
-                                    className={`w-full text-left px-3 py-2 rounded border text-sm flex items-center gap-2 transition-colors ${activeGroupId === g.id ? 'bg-amber-900/30 border-amber-600 text-amber-500' : 'bg-gray-800/50 hover:bg-gray-800 border-gray-700 text-gray-400'}`}
-                                >
-                                    <Flag size={14} className={activeGroupId === g.id ? "text-amber-500" : "text-gray-500"} /> 
-                                    {g.name}
-                                </button>
-                            ))}
+                        
+                        {/* Multi-Context Selector */}
+                        <div className="mb-6 relative" ref={groupDropdownRef}>
+                            <h3 className="text-xs uppercase text-gray-500 font-semibold mb-2 tracking-wider">Historical Contexts</h3>
+                            <button 
+                                onClick={() => setIsGroupDropdownOpen(!isGroupDropdownOpen)}
+                                className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-sm text-white flex justify-between items-center hover:border-gray-600 transition-colors"
+                            >
+                                <span className="truncate">
+                                    {activeGroupIds.length === 0 
+                                        ? "Select contexts..." 
+                                        : `${activeGroupIds.length} context${activeGroupIds.length > 1 ? 's' : ''} active`}
+                                </span>
+                                <ChevronDown size={14} className="text-gray-500" />
+                            </button>
+
+                            {isGroupDropdownOpen && (
+                                <div className="absolute top-full left-0 right-0 mt-1 bg-gray-800 border border-gray-600 rounded shadow-xl z-20 max-h-60 overflow-y-auto custom-scrollbar">
+                                    {groups.map(g => (
+                                        <div 
+                                            key={g.id}
+                                            onClick={() => toggleGroupSelection(g.id)}
+                                            className="flex items-center gap-2 px-3 py-2 hover:bg-gray-700 cursor-pointer border-b border-gray-700/50 last:border-0"
+                                        >
+                                            <div className={`w-4 h-4 rounded border flex items-center justify-center ${activeGroupIds.includes(g.id) ? 'bg-amber-600 border-amber-600' : 'border-gray-500 bg-gray-900'}`}>
+                                                {activeGroupIds.includes(g.id) && <Check size={10} className="text-white" />}
+                                            </div>
+                                            <span className={`text-sm ${activeGroupIds.includes(g.id) ? 'text-white' : 'text-gray-400'}`}>
+                                                {g.name}
+                                            </span>
+                                        </div>
+                                    ))}
+                                    {groups.length === 0 && <div className="p-3 text-xs text-gray-500 text-center">No groups defined.</div>}
+                                </div>
+                            )}
                         </div>
-                        <div className="mt-8 p-4 bg-gray-800/30 rounded border border-gray-800 text-xs text-gray-500 italic">
-                             Entities shown on the timeline are filtered based on the selected historical group context.
+
+                        <div className="space-y-6">
+                            {/* Nucleus Entities */}
+                            {nucleusEntities.length > 0 && (
+                                <div>
+                                    <h4 className="text-[10px] uppercase text-amber-500 font-bold mb-2 flex items-center gap-1 border-b border-amber-900/30 pb-1">
+                                        <Flag size={10} /> Nucleus Entities
+                                    </h4>
+                                    <div className="space-y-1">
+                                        {nucleusEntities.map(e => (
+                                            <div key={e.id} className="flex items-center justify-between p-2 rounded bg-gray-800/30 border border-gray-800">
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: e.periods[0]?.color || '#444' }}></div>
+                                                    <span className={`text-sm truncate ${hiddenEntityIds.includes(e.id) ? 'text-gray-500 line-through' : 'text-gray-300'}`}>
+                                                        {e.name}
+                                                    </span>
+                                                </div>
+                                                <button 
+                                                    onClick={() => onToggleEntityVisibility(e.id)}
+                                                    className="text-gray-500 hover:text-white"
+                                                    title={hiddenEntityIds.includes(e.id) ? "Show" : "Hide"}
+                                                >
+                                                    {hiddenEntityIds.includes(e.id) ? <EyeOff size={14} /> : <Eye size={14} />}
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Secondary Entities */}
+                            {secondaryEntities.length > 0 && (
+                                <div>
+                                    <h4 className="text-[10px] uppercase text-blue-400 font-bold mb-2 flex items-center gap-1 border-b border-blue-900/30 pb-1">
+                                        <Layers size={10} /> Secondary Entities
+                                    </h4>
+                                    <div className="space-y-1">
+                                        {secondaryEntities.map(e => (
+                                            <div key={e.id} className="flex items-center justify-between p-2 rounded bg-gray-800/30 border border-gray-800">
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: e.periods[0]?.color || '#444' }}></div>
+                                                    <span className={`text-sm truncate ${hiddenEntityIds.includes(e.id) ? 'text-gray-500 line-through' : 'text-gray-300'}`}>
+                                                        {e.name}
+                                                    </span>
+                                                </div>
+                                                 <button 
+                                                    onClick={() => onToggleEntityVisibility(e.id)}
+                                                    className="text-gray-500 hover:text-white"
+                                                    title={hiddenEntityIds.includes(e.id) ? "Show" : "Hide"}
+                                                >
+                                                    {hiddenEntityIds.includes(e.id) ? <EyeOff size={14} /> : <Eye size={14} />}
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {activeGroupIds.length > 0 && nucleusEntities.length === 0 && secondaryEntities.length === 0 && (
+                                <div className="text-center text-xs text-gray-500 py-4 italic">
+                                    No entities defined for the selected contexts.
+                                </div>
+                            )}
                         </div>
+
                     </div>
                 ) : (
                     // Admin Tab Content

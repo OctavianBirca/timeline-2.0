@@ -10,7 +10,8 @@ interface TimelineProps {
   dynasties: Dynasty[];
   minYear: number;
   maxYear: number;
-  activeGroupId: string;
+  activeGroupIds: string[];
+  hiddenEntityIds: string[];
   updatePerson: (person: Person) => void;
   onToggleFamily: (id: string, type: 'ancestors' | 'descendants' | 'spouses') => void;
 }
@@ -22,7 +23,8 @@ const Timeline: React.FC<TimelineProps> = ({
   dynasties,
   minYear,
   maxYear,
-  activeGroupId,
+  activeGroupIds,
+  hiddenEntityIds,
   updatePerson,
   onToggleFamily
 }) => {
@@ -53,28 +55,38 @@ const Timeline: React.FC<TimelineProps> = ({
 
   // --- Entities & Layout Calculation relative to Active Group ---
   
-  // Flatten periods that are relevant to the active context
+  // Flatten periods that are relevant to the active contexts (multiple)
   const activePeriods = useMemo(() => {
      const flat = [];
      for(const entity of entities) {
+        // Skip manually hidden entities
+        if (hiddenEntityIds.includes(entity.id)) continue;
+
         for(const period of entity.periods) {
-            const context = period.contexts.find(c => c.groupId === activeGroupId);
-            if(context) {
-                flat.push({
-                    entityId: entity.id,
-                    name: entity.name,
-                    periodId: period.id,
-                    startYear: period.startYear,
-                    endYear: period.endYear,
-                    color: period.color,
-                    vassalage: period.vassalage,
-                    ...context // adds role, heightIndex, rowSpan
-                });
+            // Check if period has ANY context matching ANY active group
+            // If multiple contexts match multiple active groups, we should probably prefer the most significant one
+            // or render multiple blocks? For simplicity, we iterate contexts and add matches.
+            // If the same period matches multiple active groups, it will appear multiple times.
+            // This allows overlap visualization if they have different roles/heights in different contexts.
+            
+            for (const context of period.contexts) {
+                if (activeGroupIds.includes(context.groupId)) {
+                    flat.push({
+                        entityId: entity.id,
+                        name: entity.name,
+                        periodId: period.id,
+                        startYear: period.startYear,
+                        endYear: period.endYear,
+                        color: period.color,
+                        vassalage: period.vassalage,
+                        ...context // adds role, heightIndex, rowSpan based on THIS context
+                    });
+                }
             }
         }
      }
      return flat;
-  }, [entities, activeGroupId]);
+  }, [entities, activeGroupIds, hiddenEntityIds]);
 
   const maxEntityIndex = useMemo(() => Math.max(0, ...activePeriods.map(p => (p.heightIndex + (p.rowSpan || 1) - 1))), [activePeriods]);
   // Use a heuristic for content height based on entities, since people are now relative
@@ -88,7 +100,7 @@ const Timeline: React.FC<TimelineProps> = ({
   
   // Calculate Person Y based on their Title relationship to the active entities
   const getPersonY = (person: Person): number => {
-      // 1. Try to find a title associated with an entity visible in the current activeGroupId
+      // 1. Try to find a title associated with an entity visible in the current activeGroupIds
       // Sort titles by importance (Nucleus first) to pick the best anchor
       const relevantTitle = person.titles
         .sort((a, b) => {
@@ -98,9 +110,12 @@ const Timeline: React.FC<TimelineProps> = ({
         .find(t => {
           const entity = entities.find(e => e.id === t.entityId);
           if(!entity) return false;
-          // Check if this entity has a period in the active context intersecting person's life
+          // Check if this entity has a period in ANY active context intersecting person's life
+          // And is not hidden
+          if (hiddenEntityIds.includes(entity.id)) return false;
+
           return entity.periods.some(ep => 
-              ep.contexts.some(c => c.groupId === activeGroupId) && 
+              ep.contexts.some(c => activeGroupIds.includes(c.groupId)) && 
               Math.max(ep.startYear, person.birthYear) < Math.min(ep.endYear, person.deathYear)
           );
       });
@@ -109,13 +124,14 @@ const Timeline: React.FC<TimelineProps> = ({
           const entity = entities.find(e => e.id === relevantTitle.entityId);
           if (entity) {
               // Find the specific period context to get the Entity's Height Index
+              // Prefer one that matches an active group
               const period = entity.periods.find(ep => 
-                  ep.contexts.some(c => c.groupId === activeGroupId) &&
+                  ep.contexts.some(c => activeGroupIds.includes(c.groupId)) &&
                   Math.max(ep.startYear, person.birthYear) < Math.min(ep.endYear, person.deathYear)
               );
               
               if (period) {
-                  const context = period.contexts.find(c => c.groupId === activeGroupId);
+                  const context = period.contexts.find(c => activeGroupIds.includes(c.groupId));
                   if (context) {
                       const entityBaseY = getEntityY(context.heightIndex);
                       const shift = relevantTitle.verticalShift || 0;
@@ -370,7 +386,7 @@ const Timeline: React.FC<TimelineProps> = ({
       }
     });
     return lines;
-  }, [visiblePeople, settings, yearToX, dynasties, globalScale, activeGroupId, entities]);
+  }, [visiblePeople, settings, yearToX, dynasties, globalScale, activeGroupIds, entities, hiddenEntityIds]);
 
   const handlePositionChange = (id: string, deltaPixels: number) => {
       const p = people.find(per => per.id === id);
