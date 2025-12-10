@@ -39,7 +39,8 @@ export interface Title {
   rank: RankLevel;
   role: CharacterRole; 
   periods: TitlePeriod[];
-  positionIndex: number; 
+  positionIndex: number; // Internal sort order of titles
+  verticalShift?: number; // Row offset relative to the Entity's base position
 }
 
 export interface TitleDefinition {
@@ -114,7 +115,7 @@ export interface Person {
   titles: Title[];
   imageUrl?: string;
   role: CharacterRole; // Fallback role if no titles
-  verticalPosition: number; 
+  verticalPosition: number; // Fallback position
   isHidden?: boolean;
   color?: string; 
 }

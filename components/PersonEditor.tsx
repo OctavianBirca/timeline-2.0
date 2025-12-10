@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { Person, Dynasty, PoliticalEntity, Title, RankLevel, CharacterRole, TitlePeriod, TitleDefinition } from '../types';
@@ -358,7 +359,8 @@ const PersonEditor: React.FC<PersonEditorProps> = ({
       rank: RankLevel.KING,
       role: CharacterRole.NUCLEUS,
       periods: [{ startYear: formData.birthYear + 20, endYear: formData.deathYear }],
-      positionIndex: 1
+      positionIndex: 1,
+      verticalShift: 0
     };
     setFormData(prev => ({ ...prev, titles: [...prev.titles, newTitle] }));
   };
@@ -679,7 +681,7 @@ const PersonEditor: React.FC<PersonEditorProps> = ({
                                     </div>
 
                                     {/* Role and Position Index */}
-                                    <div className="mb-3 grid grid-cols-2 gap-4">
+                                    <div className="mb-3 grid grid-cols-3 gap-4">
                                          <div>
                                             <label className="block text-[10px] uppercase text-gray-500 font-bold mb-1">Role in Entity</label>
                                             <select
@@ -693,13 +695,24 @@ const PersonEditor: React.FC<PersonEditorProps> = ({
                                             </select>
                                          </div>
                                          <div>
-                                            <label className="block text-[10px] uppercase text-gray-500 font-bold mb-1">Position Index</label>
+                                            <label className="block text-[10px] uppercase text-gray-500 font-bold mb-1">Stack Order</label>
                                             <input 
                                                 type="number"
                                                 value={title.positionIndex}
                                                 onChange={e => handleTitlePropertyChange(idx, 'positionIndex', parseInt(e.target.value))}
                                                 className="w-full bg-gray-900 border border-gray-700 rounded p-1.5 text-sm h-[38px]"
-                                                title="Determines vertical stacking order"
+                                                title="Order of titles inside card"
+                                            />
+                                         </div>
+                                         <div>
+                                            <label className="block text-[10px] uppercase text-gray-500 font-bold mb-1">Vertical Shift (Row)</label>
+                                            <input 
+                                                type="number"
+                                                step="0.5"
+                                                value={title.verticalShift || 0}
+                                                onChange={e => handleTitlePropertyChange(idx, 'verticalShift', parseFloat(e.target.value))}
+                                                className="w-full bg-gray-900 border border-gray-700 rounded p-1.5 text-sm h-[38px]"
+                                                title="Shift person relative to entity position"
                                             />
                                          </div>
                                     </div>

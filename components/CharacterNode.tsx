@@ -1,8 +1,8 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Person, Dynasty, ViewSettings, PoliticalEntity, CharacterRole } from '../types';
 import { MONTHS } from '../constants';
-import { EyeOff, Heart, GripVertical, ChevronLeft, ChevronRight, Plus, Minus } from 'lucide-react';
+import { EyeOff, Heart, Plus } from 'lucide-react';
 
 interface CharacterNodeProps {
   person: Person;
@@ -14,7 +14,7 @@ interface CharacterNodeProps {
   contentOffset?: number; // Distance in pixels from left edge (Birth Year) to center of Reign
   settings: ViewSettings;
   onToggleHide: (id: string) => void;
-  onVerticalMove: (id: string, direction: -1 | 1) => void;
+  onPositionChange: (id: string, deltaY: number) => void;
   onToggleFamily: (id: string, type: 'ancestors' | 'descendants' | 'spouses') => void;
   scale?: number; // Dynamic scale factor for semantic zooming (default 1)
 }
@@ -29,11 +29,44 @@ const CharacterNode: React.FC<CharacterNodeProps> = ({
   contentOffset = 0,
   settings,
   onToggleHide,
-  onVerticalMove,
+  onPositionChange,
   onToggleFamily,
   scale = 1
 }) => {
   const [isHovered, setIsHovered] = useState(false);
+  
+  // Drag State
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragDy, setDragDy] = useState(0);
+
+  // Drag Logic
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+        setDragDy(prev => prev + e.movementY);
+    };
+
+    const handleMouseUp = () => {
+        setIsDragging(false);
+        onPositionChange(person.id, dragDy);
+        setDragDy(0); // Reset local visual offset after commit
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, dragDy, onPositionChange, person.id]);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+      if (e.button !== 0) return; // Only left click
+      e.stopPropagation(); // Prevent canvas panning if implemented
+      setIsDragging(true);
+  };
 
   // Determine Effective Role: Nucleus > Secondary > Tertiary
   const effectiveRole = useMemo(() => {
@@ -85,10 +118,6 @@ const CharacterNode: React.FC<CharacterNodeProps> = ({
       return `${years} years`;
   }, [person]);
 
-  const handleDragStart = (e: React.DragEvent) => {
-      e.dataTransfer.setData("text/plain", person.id);
-  };
-
   // Sort titles by positionIndex for correct vertical stacking
   const sortedTitles = useMemo(() => {
       return [...person.titles].sort((a, b) => (a.positionIndex || 0) - (b.positionIndex || 0));
@@ -112,17 +141,16 @@ const CharacterNode: React.FC<CharacterNodeProps> = ({
 
   return (
     <div
-      className="absolute flex flex-col items-start group select-none"
+      className={`absolute flex flex-col items-start group select-none ${isDragging ? 'cursor-grabbing z-50' : 'cursor-grab hover:z-40'}`}
       style={{
         left: x,
-        top: y,
+        top: y + dragDy, // Apply drag offset visually
         width: width,
-        transition: 'top 0.3s ease-in-out'
+        transition: isDragging ? 'none' : 'top 0.3s ease-in-out'
       }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      draggable
-      onDragStart={handleDragStart}
+      onMouseDown={handleMouseDown}
     >
       {/* Lifespan Line (Strictly Birth to Death) */}
       {settings.showLifespans && (
@@ -148,36 +176,22 @@ const CharacterNode: React.FC<CharacterNodeProps> = ({
       >
         {/* Action Buttons Overlay (Visible on Hover) */}
         <div 
-          className={`absolute flex gap-2 transition-opacity duration-200 ${isHovered ? 'opacity-100' : 'opacity-0'}`}
+          className={`absolute flex gap-2 transition-opacity duration-200 ${isHovered && !isDragging ? 'opacity-100' : 'opacity-0'}`}
           style={{ top: `-${24 * scale}px`, transform: `scale(${scale})` }}
         >
             <button 
-            onClick={() => onVerticalMove(person.id, -1)}
-            className="p-1 bg-gray-800 rounded-full hover:bg-gray-700 text-gray-300"
-            title="Move Up"
-            >
-            <GripVertical size={12} />
-            </button>
-            <button 
-            onClick={() => onToggleFamily(person.id, 'spouses')}
+            onClick={(e) => { e.stopPropagation(); onToggleFamily(person.id, 'spouses'); }}
             className="p-1 bg-gray-800 rounded-full hover:bg-gray-700 text-red-400"
             title="Toggle Spouses Visibility"
             >
             <Heart size={12} />
             </button>
             <button 
-            onClick={() => onToggleHide(person.id)}
+            onClick={(e) => { e.stopPropagation(); onToggleHide(person.id); }}
             className="p-1 bg-gray-800 rounded-full hover:bg-gray-700 text-gray-300"
             title="Hide Character"
             >
             <EyeOff size={12} />
-            </button>
-            <button 
-            onClick={() => onVerticalMove(person.id, 1)}
-            className="p-1 bg-gray-800 rounded-full hover:bg-gray-700 text-gray-300"
-            title="Move Down"
-            >
-            <GripVertical size={12} />
             </button>
         </div>
 
@@ -185,10 +199,11 @@ const CharacterNode: React.FC<CharacterNodeProps> = ({
         <div className="relative">
             {/* Expand Ancestors (Left) */}
             <button
-                onClick={() => onToggleFamily(person.id, 'ancestors')} 
-                className={`absolute -left-5 bg-gray-800 text-gray-400 rounded-full hover:bg-amber-900 hover:text-amber-500 border border-gray-600 flex items-center justify-center transition-opacity z-30 ${isHovered ? 'opacity-100' : 'opacity-0'}`}
+                onClick={(e) => { e.stopPropagation(); onToggleFamily(person.id, 'ancestors'); }} 
+                className={`absolute -left-5 bg-gray-800 text-gray-400 rounded-full hover:bg-amber-900 hover:text-amber-500 border border-gray-600 flex items-center justify-center transition-opacity z-30 ${isHovered && !isDragging ? 'opacity-100' : 'opacity-0'}`}
                 style={sideBtnStyle}
                 title="Expand Ancestors"
+                onMouseDown={(e) => e.stopPropagation()} // Prevent drag start
             >
                 <Plus size={10 * scale} />
             </button>
@@ -206,7 +221,7 @@ const CharacterNode: React.FC<CharacterNodeProps> = ({
                 }}
             >
                 {person.imageUrl ? (
-                <img src={person.imageUrl} alt={person.officialName} className="w-full h-full object-cover" />
+                <img src={person.imageUrl} alt={person.officialName} className="w-full h-full object-cover pointer-events-none" />
                 ) : (
                 <div 
                     className="w-full h-full flex items-center justify-center bg-gray-800 text-center"
@@ -219,10 +234,11 @@ const CharacterNode: React.FC<CharacterNodeProps> = ({
 
             {/* Expand Descendants (Right) */}
             <button 
-                onClick={() => onToggleFamily(person.id, 'descendants')}
-                className={`absolute -right-5 bg-gray-800 text-gray-400 rounded-full hover:bg-amber-900 hover:text-amber-500 border border-gray-600 flex items-center justify-center transition-opacity z-30 ${isHovered ? 'opacity-100' : 'opacity-0'}`}
+                onClick={(e) => { e.stopPropagation(); onToggleFamily(person.id, 'descendants'); }}
+                className={`absolute -right-5 bg-gray-800 text-gray-400 rounded-full hover:bg-amber-900 hover:text-amber-500 border border-gray-600 flex items-center justify-center transition-opacity z-30 ${isHovered && !isDragging ? 'opacity-100' : 'opacity-0'}`}
                 style={sideBtnStyle}
                 title="Expand Descendants"
+                onMouseDown={(e) => e.stopPropagation()} // Prevent drag start
             >
                  <Plus size={10 * scale} />
             </button>

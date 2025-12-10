@@ -77,19 +77,61 @@ const Timeline: React.FC<TimelineProps> = ({
   }, [entities, activeGroupId]);
 
   const maxEntityIndex = useMemo(() => Math.max(0, ...activePeriods.map(p => (p.heightIndex + (p.rowSpan || 1) - 1))), [activePeriods]);
-  const maxPersonIndex = useMemo(() => Math.max(0, ...people.filter(p => !p.isHidden).map(p => p.verticalPosition)), [people]);
-
+  // Use a heuristic for content height based on entities, since people are now relative
   const contentHeight = Math.max(
-    500,
-    Math.max(
-      (maxEntityIndex + 1) * ENTITY_LAYER_HEIGHT + 100,
-      (maxPersonIndex + 1) * SLOT_HEIGHT + 100
-    )
+    800,
+    (maxEntityIndex + 2) * ENTITY_LAYER_HEIGHT + 200
   );
 
   // --- Y Positioning Helpers ---
-  const getPersonY = (index: number) => index * SLOT_HEIGHT + (40 * globalScale);
-  const getEntityY = (index: number) => index * ENTITY_LAYER_HEIGHT + (20 * globalScale);
+  const getEntityY = (index: number) => index * ENTITY_LAYER_HEIGHT + (40 * globalScale);
+  
+  // Calculate Person Y based on their Title relationship to the active entities
+  const getPersonY = (person: Person): number => {
+      // 1. Try to find a title associated with an entity visible in the current activeGroupId
+      // Sort titles by importance (Nucleus first) to pick the best anchor
+      const relevantTitle = person.titles
+        .sort((a, b) => {
+             const roleScore = (r: CharacterRole) => r === CharacterRole.NUCLEUS ? 2 : r === CharacterRole.SECONDARY ? 1 : 0;
+             return roleScore(b.role) - roleScore(a.role);
+        })
+        .find(t => {
+          const entity = entities.find(e => e.id === t.entityId);
+          if(!entity) return false;
+          // Check if this entity has a period in the active context intersecting person's life
+          return entity.periods.some(ep => 
+              ep.contexts.some(c => c.groupId === activeGroupId) && 
+              Math.max(ep.startYear, person.birthYear) < Math.min(ep.endYear, person.deathYear)
+          );
+      });
+
+      if (relevantTitle) {
+          const entity = entities.find(e => e.id === relevantTitle.entityId);
+          if (entity) {
+              // Find the specific period context to get the Entity's Height Index
+              const period = entity.periods.find(ep => 
+                  ep.contexts.some(c => c.groupId === activeGroupId) &&
+                  Math.max(ep.startYear, person.birthYear) < Math.min(ep.endYear, person.deathYear)
+              );
+              
+              if (period) {
+                  const context = period.contexts.find(c => c.groupId === activeGroupId);
+                  if (context) {
+                      const entityBaseY = getEntityY(context.heightIndex);
+                      const shift = relevantTitle.verticalShift || 0;
+                      // Place person relative to entity. 
+                      // Default (shift 0) puts them slightly offset from top of entity block
+                      return entityBaseY + (shift * (IMG_SIZE_NUCLEUS * 1.5)) + (20 * globalScale); 
+                  }
+              }
+          }
+      }
+
+      // Fallback: Use global verticalPosition as a multiplier of a standard row height, 
+      // placed below the entity layers
+      const fallbackBaseY = (maxEntityIndex + 1) * ENTITY_LAYER_HEIGHT + (100 * globalScale);
+      return fallbackBaseY + (person.verticalPosition * SLOT_HEIGHT);
+  };
   
   const getEntity = (id: string) => entities.find(e => e.id === id);
 
@@ -193,7 +235,7 @@ const Timeline: React.FC<TimelineProps> = ({
       const pImgSize = getImgSize(role);
       
       const nodeX = yearToX(person.birthYear);
-      const nodeY = getPersonY(person.verticalPosition);
+      const nodeY = getPersonY(person);
       const pReign = getReignGeometry(person);
       const pReignMidOffset = (pReign.mid - person.birthYear) * settings.zoom;
       
@@ -219,7 +261,7 @@ const Timeline: React.FC<TimelineProps> = ({
                 const fImgSize = getImgSize(parentRole);
                 
                 const fNodeX = yearToX(parent.birthYear);
-                const fNodeY = getPersonY(parent.verticalPosition);
+                const fNodeY = getPersonY(parent);
                 
                 const fReign = getReignGeometry(parent);
                 const fReignMidOffset = (fReign.mid - parent.birthYear) * settings.zoom;
@@ -274,7 +316,7 @@ const Timeline: React.FC<TimelineProps> = ({
                 const spouseRole = getEffectiveRole(spouse);
                 const sImgSize = getImgSize(spouseRole);
                 const sNodeX = yearToX(spouse.birthYear);
-                const sNodeY = getPersonY(spouse.verticalPosition);
+                const sNodeY = getPersonY(spouse);
                 
                 const sReign = getReignGeometry(spouse);
                 const sReignMidOffset = (sReign.mid - spouse.birthYear) * settings.zoom;
@@ -328,16 +370,34 @@ const Timeline: React.FC<TimelineProps> = ({
       }
     });
     return lines;
-  }, [visiblePeople, settings, yearToX, dynasties, globalScale]);
+  }, [visiblePeople, settings, yearToX, dynasties, globalScale, activeGroupId, entities]);
 
-  const handleVerticalMove = (id: string, direction: -1 | 1) => {
-    const p = people.find(per => per.id === id);
-    if(p) {
-      updatePerson({
-        ...p,
-        verticalPosition: Math.max(0, p.verticalPosition + direction)
-      });
-    }
+  const handlePositionChange = (id: string, deltaPixels: number) => {
+      const p = people.find(per => per.id === id);
+      if(!p) return;
+
+      // 1 unit of vertical shift is approximately IMG_SIZE_NUCLEUS * 1.5 pixels
+      // e.g. 60 * 1.5 = 90px
+      const unitPixels = IMG_SIZE_NUCLEUS * 1.5;
+      const deltaUnits = deltaPixels / unitPixels;
+
+      if(p.titles.length > 0) {
+        // Update shift of first title as a proxy
+        const newTitles = [...p.titles];
+        // Accumulate and round to nearest 0.1 for cleanness
+        const rawShift = (newTitles[0].verticalShift || 0) + deltaUnits;
+        const newShift = Math.round(rawShift * 10) / 10;
+        newTitles[0] = { ...newTitles[0], verticalShift: newShift };
+        updatePerson({ ...p, titles: newTitles });
+      } else {
+        // Update global position
+        // Fallback positioning uses SLOT_HEIGHT
+        const deltaSlots = deltaPixels / SLOT_HEIGHT;
+        const rawPos = p.verticalPosition + deltaSlots;
+        // Allow negative positions (dragging up)
+        const newPos = Math.round(rawPos * 10) / 10;
+        updatePerson({ ...p, verticalPosition: newPos });
+      }
   };
 
   const handleToggleHide = (id: string) => {
@@ -481,7 +541,7 @@ const Timeline: React.FC<TimelineProps> = ({
                   {visiblePeople.map(p => {
                     const width = yearToX(p.deathYear) - yearToX(p.birthYear);
                     const x = yearToX(p.birthYear);
-                    const y = getPersonY(p.verticalPosition);
+                    const y = getPersonY(p);
                     const reign = getReignGeometry(p);
                     const contentOffset = (reign.mid - p.birthYear) * settings.zoom;
 
@@ -497,7 +557,7 @@ const Timeline: React.FC<TimelineProps> = ({
                         contentOffset={contentOffset}
                         settings={settings}
                         onToggleHide={handleToggleHide}
-                        onVerticalMove={handleVerticalMove}
+                        onPositionChange={handlePositionChange}
                         onToggleFamily={onToggleFamily}
                         scale={globalScale}
                       />

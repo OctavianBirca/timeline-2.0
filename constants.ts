@@ -84,7 +84,7 @@ export const MOCK_ENTITIES: PoliticalEntity[] = [
         endYear: 843,
         color: 'rgba(16, 185, 129, 0.2)',
         contexts: [
-          { groupId: 'g1', role: CharacterRole.NUCLEUS, heightIndex: 0, rowSpan: 1 }
+          { groupId: 'g1', role: CharacterRole.NUCLEUS, heightIndex: 0, rowSpan: 2 }
         ],
         vassalage: []
       }
@@ -141,7 +141,7 @@ export const MOCK_PEOPLE: Person[] = [
     verticalPosition: 1,
     imageUrl: 'https://picsum.photos/id/100/200/200',
     titles: [
-      { id: 't1', name: 'King of the Franks', entityId: 'kingdom_franks', rank: RankLevel.KING, role: CharacterRole.NUCLEUS, periods: [{ startYear: 481, endYear: 511 }], positionIndex: 0 }
+      { id: 't1', name: 'King of the Franks', entityId: 'kingdom_franks', rank: RankLevel.KING, role: CharacterRole.NUCLEUS, periods: [{ startYear: 481, endYear: 511 }], positionIndex: 0, verticalShift: 0 }
     ]
   },
   {
@@ -168,8 +168,8 @@ export const MOCK_PEOPLE: Person[] = [
     verticalPosition: 1,
     imageUrl: 'https://picsum.photos/id/101/200/200',
     titles: [
-      { id: 't2', name: 'King of Soissons', entityId: 'kingdom_franks', rank: RankLevel.KING, role: CharacterRole.NUCLEUS, periods: [{ startYear: 511, endYear: 558 }], positionIndex: 0 },
-      { id: 't3', name: 'King of the Franks', entityId: 'kingdom_franks', rank: RankLevel.KING, role: CharacterRole.NUCLEUS, periods: [{ startYear: 558, endYear: 561 }], positionIndex: 1 }
+      { id: 't2', name: 'King of Soissons', entityId: 'kingdom_franks', rank: RankLevel.KING, role: CharacterRole.NUCLEUS, periods: [{ startYear: 511, endYear: 558 }], positionIndex: 0, verticalShift: 0 },
+      { id: 't3', name: 'King of the Franks', entityId: 'kingdom_franks', rank: RankLevel.KING, role: CharacterRole.NUCLEUS, periods: [{ startYear: 558, endYear: 561 }], positionIndex: 1, verticalShift: 0 }
     ]
   },
   {
@@ -183,8 +183,8 @@ export const MOCK_PEOPLE: Person[] = [
     verticalPosition: 3,
     imageUrl: 'https://picsum.photos/id/102/200/200',
     titles: [
-      { id: 't4', name: 'King of the Franks', entityId: 'kingdom_franks', rank: RankLevel.KING, role: CharacterRole.NUCLEUS, periods: [{ startYear: 751, endYear: 768 }], positionIndex: 0 },
-      { id: 't5', name: 'Mayor of the Palace', entityId: 'kingdom_neustria', rank: RankLevel.DUKE, role: CharacterRole.SECONDARY, periods: [{ startYear: 741, endYear: 751 }], positionIndex: 1 }
+      { id: 't4', name: 'King of the Franks', entityId: 'kingdom_franks', rank: RankLevel.KING, role: CharacterRole.NUCLEUS, periods: [{ startYear: 751, endYear: 768 }], positionIndex: 0, verticalShift: 0 },
+      { id: 't5', name: 'Mayor of the Palace', entityId: 'kingdom_neustria', rank: RankLevel.DUKE, role: CharacterRole.SECONDARY, periods: [{ startYear: 741, endYear: 751 }], positionIndex: 1, verticalShift: 0 }
     ]
   },
   {
@@ -203,8 +203,8 @@ export const MOCK_PEOPLE: Person[] = [
     verticalPosition: 3,
     imageUrl: 'https://picsum.photos/id/103/200/200',
     titles: [
-      { id: 't6', name: 'King of the Franks', entityId: 'kingdom_franks', rank: RankLevel.KING, role: CharacterRole.NUCLEUS, periods: [{ startYear: 768, endYear: 814 }], positionIndex: 0 },
-      { id: 't7', name: 'Emperor of the Romans', entityId: 'hre', rank: RankLevel.EMPEROR, role: CharacterRole.NUCLEUS, periods: [{ startYear: 800, endYear: 814 }], positionIndex: 1 }
+      { id: 't6', name: 'King of the Franks', entityId: 'kingdom_franks', rank: RankLevel.KING, role: CharacterRole.NUCLEUS, periods: [{ startYear: 768, endYear: 814 }], positionIndex: 0, verticalShift: 0 },
+      { id: 't7', name: 'Emperor of the Romans', entityId: 'hre', rank: RankLevel.EMPEROR, role: CharacterRole.NUCLEUS, periods: [{ startYear: 800, endYear: 814 }], positionIndex: 1, verticalShift: 0 }
     ]
   }
 ];
