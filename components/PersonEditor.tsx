@@ -12,6 +12,7 @@ interface PersonEditorProps {
   entities: PoliticalEntity[];
   titleDefinitions: TitleDefinition[];
   onSave: (updatedPerson: Person) => void;
+  onDelete: (id: string) => void;
   onCancel: () => void;
 }
 
@@ -207,6 +208,7 @@ const PersonEditor: React.FC<PersonEditorProps> = ({
   entities,
   titleDefinitions,
   onSave,
+  onDelete,
   onCancel
 }) => {
   const [formData, setFormData] = useState<Person>({ ...person });
@@ -540,10 +542,21 @@ const PersonEditor: React.FC<PersonEditorProps> = ({
                                 <span className="text-xs text-gray-500">Overrides dynasty color if set</span>
                             </div>
                         </div>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-400 mb-1">Biography / Description</label>
+                            <textarea 
+                                value={formData.description || ''} 
+                                onChange={e => handleChange('description', e.target.value)}
+                                className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-sm text-white focus:ring-1 focus:ring-amber-500 outline-none min-h-[80px]"
+                                placeholder="Historical details about this person..."
+                            />
+                        </div>
                     </div>
                 </div>
             )}
 
+            {/* ... rest of the tabs same as before ... */}
+            
             {/* --- RELATIONS TAB --- */}
             {activeTab === 'relations' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -784,19 +797,27 @@ const PersonEditor: React.FC<PersonEditorProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-gray-800 bg-gray-950 flex justify-end gap-3">
-            <button 
-                onClick={onCancel}
-                className="px-4 py-2 rounded text-gray-400 hover:bg-gray-800 hover:text-white text-sm font-medium transition-colors"
+        <div className="p-4 border-t border-gray-800 bg-gray-950 flex justify-between gap-3">
+             <button 
+                onClick={() => onDelete(formData.id)}
+                className="px-4 py-2 rounded text-red-500 hover:bg-red-900/20 hover:text-red-400 text-sm font-medium transition-colors flex items-center gap-1"
             >
-                Cancel
+                <Trash2 size={16} /> Delete
             </button>
-            <button 
-                onClick={() => onSave(formData)}
-                className="px-6 py-2 rounded bg-amber-600 hover:bg-amber-500 text-white text-sm font-bold shadow-lg shadow-amber-900/20 flex items-center gap-2 transition-colors"
-            >
-                <Save size={16} /> Save Changes
-            </button>
+            <div className="flex gap-3">
+                <button 
+                    onClick={onCancel}
+                    className="px-4 py-2 rounded text-gray-400 hover:bg-gray-800 hover:text-white text-sm font-medium transition-colors"
+                >
+                    Cancel
+                </button>
+                <button 
+                    onClick={() => onSave(formData)}
+                    className="px-6 py-2 rounded bg-amber-600 hover:bg-amber-500 text-white text-sm font-bold shadow-lg shadow-amber-900/20 flex items-center gap-2 transition-colors"
+                >
+                    <Save size={16} /> Save Changes
+                </button>
+            </div>
         </div>
 
       </div>

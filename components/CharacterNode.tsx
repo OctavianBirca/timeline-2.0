@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Person, Dynasty, ViewSettings, PoliticalEntity, CharacterRole } from '../types';
 import { MONTHS } from '../constants';
-import { EyeOff, Heart, Plus } from 'lucide-react';
+import { EyeOff, Heart, Plus, Info } from 'lucide-react';
 
 interface CharacterNodeProps {
   person: Person;
@@ -16,6 +16,7 @@ interface CharacterNodeProps {
   onToggleHide: (id: string) => void;
   onPositionChange: (id: string, deltaY: number) => void;
   onToggleFamily: (id: string, type: 'ancestors' | 'descendants' | 'spouses') => void;
+  onViewInfo: (id: string) => void;
   scale?: number; // Dynamic scale factor for semantic zooming (default 1)
 }
 
@@ -31,6 +32,7 @@ const CharacterNode: React.FC<CharacterNodeProps> = ({
   onToggleHide,
   onPositionChange,
   onToggleFamily,
+  onViewInfo,
   scale = 1
 }) => {
   const [isHovered, setIsHovered] = useState(false);
@@ -68,6 +70,11 @@ const CharacterNode: React.FC<CharacterNodeProps> = ({
       setIsDragging(true);
   };
 
+  const handleDoubleClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      onViewInfo(person.id);
+  };
+
   // Determine Effective Role: Nucleus > Secondary > Tertiary
   const effectiveRole = useMemo(() => {
     if (person.titles.length > 0) {
@@ -81,10 +88,10 @@ const CharacterNode: React.FC<CharacterNodeProps> = ({
   // Use person's custom color if set, otherwise fallback to dynasty color
   const borderColor = person.color || dynasty?.color || '#9ca3af';
   
-  // Sizing Logic: Nucleus 60, Secondary 45, Tertiary 30 (all scaled)
-  let baseSize = 45;
-  if (effectiveRole === CharacterRole.NUCLEUS) baseSize = 60;
-  else if (effectiveRole === CharacterRole.TERTIARY) baseSize = 30;
+  // Sizing Logic: Nucleus 40, Secondary 30, Tertiary 20 (all scaled)
+  let baseSize = 30;
+  if (effectiveRole === CharacterRole.NUCLEUS) baseSize = 40;
+  else if (effectiveRole === CharacterRole.TERTIARY) baseSize = 20;
 
   const imageSize = baseSize * scale;
   
@@ -151,6 +158,7 @@ const CharacterNode: React.FC<CharacterNodeProps> = ({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onMouseDown={handleMouseDown}
+      onDoubleClick={handleDoubleClick}
     >
       {/* Lifespan Line (Strictly Birth to Death) */}
       {settings.showLifespans && (
@@ -180,18 +188,25 @@ const CharacterNode: React.FC<CharacterNodeProps> = ({
           style={{ top: `-${24 * scale}px`, transform: `scale(${scale})` }}
         >
             <button 
-            onClick={(e) => { e.stopPropagation(); onToggleFamily(person.id, 'spouses'); }}
-            className="p-1 bg-gray-800 rounded-full hover:bg-gray-700 text-red-400"
-            title="Toggle Spouses Visibility"
+                onClick={(e) => { e.stopPropagation(); onViewInfo(person.id); }}
+                className="p-1 bg-gray-800 rounded-full hover:bg-gray-700 text-blue-400"
+                title="View Info"
             >
-            <Heart size={12} />
+                <Info size={12} />
             </button>
             <button 
-            onClick={(e) => { e.stopPropagation(); onToggleHide(person.id); }}
-            className="p-1 bg-gray-800 rounded-full hover:bg-gray-700 text-gray-300"
-            title="Hide Character"
+                onClick={(e) => { e.stopPropagation(); onToggleFamily(person.id, 'spouses'); }}
+                className="p-1 bg-gray-800 rounded-full hover:bg-gray-700 text-red-400"
+                title="Toggle Spouses Visibility"
             >
-            <EyeOff size={12} />
+                <Heart size={12} />
+            </button>
+            <button 
+                onClick={(e) => { e.stopPropagation(); onToggleHide(person.id); }}
+                className="p-1 bg-gray-800 rounded-full hover:bg-gray-700 text-gray-300"
+                title="Hide Character"
+            >
+                <EyeOff size={12} />
             </button>
         </div>
 

@@ -1,14 +1,17 @@
 
 import React, { useState } from 'react';
 import { PoliticalEntity, EntityPeriod, CharacterRole, HistoricalGroup, EntityContextRole, EntityVassalage } from '../types';
-import { X, Plus, Trash2, Save, Flag, Layers, Palette, FolderTree, Anchor } from 'lucide-react';
+import { X, Plus, Trash2, Save, Flag, Layers, Palette, FolderTree, Anchor, Calendar } from 'lucide-react';
+import { MONTHS } from '../constants';
 
 interface EntityEditorProps {
   entity: PoliticalEntity;
   allEntities: PoliticalEntity[];
   groups: HistoricalGroup[];
   onSave: (updatedEntity: PoliticalEntity) => void;
+  onDelete: (id: string) => void;
   onCancel: () => void;
+  activeGroupId: string;
 }
 
 // Helpers for Color Conversion
@@ -34,12 +37,65 @@ const hexToRgba = (hex: string, alpha: number) => {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
+// --- Reusable Date Input Group ---
+const DateGroup: React.FC<{
+  label: string;
+  year: number;
+  month?: number;
+  day?: number;
+  onYearChange: (v: number) => void;
+  onMonthChange: (v: number) => void;
+  onDayChange: (v: number) => void;
+}> = ({ label, year, month, day, onYearChange, onMonthChange, onDayChange }) => {
+  return (
+    <div className="w-full">
+      <label className="block text-[10px] uppercase text-gray-500 font-bold mb-1 flex items-center gap-1">
+        <Calendar size={10}/> {label}
+      </label>
+      <div className="flex gap-1">
+        {/* Day */}
+        <input 
+          type="number" 
+          placeholder="DD"
+          min={1} max={31}
+          value={day || ''}
+          onChange={(e) => onDayChange(parseInt(e.target.value) || 0)}
+          className="w-10 bg-gray-800 border border-gray-700 rounded p-1.5 text-xs text-center focus:ring-1 focus:ring-blue-500"
+        />
+        {/* Month */}
+        <div className="flex-1 min-w-[60px]">
+           <select 
+              value={month || ''}
+              onChange={(e) => onMonthChange(parseInt(e.target.value) || 0)}
+              className="w-full bg-gray-800 border border-gray-700 rounded p-1.5 text-xs focus:ring-1 focus:ring-blue-500 h-[30px]"
+           >
+              <option value="">Month</option>
+              {MONTHS.map(m => (
+                <option key={m.value} value={m.value}>{m.label}</option>
+              ))}
+           </select>
+        </div>
+        {/* Year */}
+        <input 
+          type="number" 
+          placeholder="YYYY"
+          value={year}
+          onChange={(e) => onYearChange(parseInt(e.target.value) || 0)}
+          className="w-16 bg-gray-800 border border-gray-700 rounded p-1.5 text-xs text-center focus:ring-1 focus:ring-blue-500 font-bold"
+        />
+      </div>
+    </div>
+  );
+};
+
 const EntityEditor: React.FC<EntityEditorProps> = ({
   entity,
   allEntities,
   groups,
   onSave,
-  onCancel
+  onDelete,
+  onCancel,
+  activeGroupId
 }) => {
   const [formData, setFormData] = useState<PoliticalEntity>({ ...entity });
 
@@ -58,6 +114,16 @@ const EntityEditor: React.FC<EntityEditorProps> = ({
         contexts: [],
         vassalage: []
     };
+    // Initialize with active group context if available
+    if (activeGroupId && groups.some(g => g.id === activeGroupId)) {
+        newPeriod.contexts.push({
+            groupId: activeGroupId,
+            role: CharacterRole.SECONDARY,
+            heightIndex: 0,
+            rowSpan: 1
+        });
+    }
+
     setFormData(prev => ({ ...prev, periods: [...prev.periods, newPeriod] }));
   };
 
@@ -71,7 +137,14 @@ const EntityEditor: React.FC<EntityEditorProps> = ({
   const updatePeriod = (index: number, field: keyof EntityPeriod, value: any) => {
       setFormData(prev => {
           const newPeriods = [...prev.periods];
-          newPeriods[index] = { ...newPeriods[index], [field]: value };
+          if (value === 0 && (field === 'startMonth' || field === 'startDay' || field === 'endMonth' || field === 'endDay')) {
+             // Handle clearing optional fields
+             const p = { ...newPeriods[index] };
+             delete (p as any)[field];
+             newPeriods[index] = p;
+          } else {
+             newPeriods[index] = { ...newPeriods[index], [field]: value };
+          }
           return { ...prev, periods: newPeriods };
       });
   };
@@ -80,8 +153,13 @@ const EntityEditor: React.FC<EntityEditorProps> = ({
 
   const addContext = (pIdx: number) => {
      if(groups.length === 0) return;
+     // Prefer activeGroupId if not already present
+     const defaultGroupId = activeGroupId && !formData.periods[pIdx].contexts.some(c => c.groupId === activeGroupId) 
+        ? activeGroupId 
+        : groups[0].id;
+
      const newContext: EntityContextRole = {
-         groupId: groups[0].id,
+         groupId: defaultGroupId,
          role: CharacterRole.SECONDARY,
          heightIndex: 0,
          rowSpan: 1
@@ -109,7 +187,9 @@ const EntityEditor: React.FC<EntityEditorProps> = ({
       setFormData(prev => {
          const newPeriods = [...prev.periods];
          const newContexts = [...newPeriods[pIdx].contexts];
-         newContexts[cIdx] = { ...newContexts[cIdx], [field]: value };
+         // Ensure number inputs don't result in NaN
+         const safeValue = (typeof value === 'number' && isNaN(value)) ? 0 : value;
+         newContexts[cIdx] = { ...newContexts[cIdx], [field]: safeValue };
          newPeriods[pIdx] = { ...newPeriods[pIdx], contexts: newContexts };
          return { ...prev, periods: newPeriods };
       });
@@ -147,7 +227,15 @@ const EntityEditor: React.FC<EntityEditorProps> = ({
       setFormData(prev => {
          const newPeriods = [...prev.periods];
          const newVassals = [...newPeriods[pIdx].vassalage];
-         newVassals[vIdx] = { ...newVassals[vIdx], [field]: value };
+         
+         if (value === 0 && (field === 'startMonth' || field === 'startDay' || field === 'endMonth' || field === 'endDay')) {
+             const v = { ...newVassals[vIdx] };
+             delete (v as any)[field];
+             newVassals[vIdx] = v;
+         } else {
+             newVassals[vIdx] = { ...newVassals[vIdx], [field]: value };
+         }
+         
          newPeriods[pIdx] = { ...newPeriods[pIdx], vassalage: newVassals };
          return { ...prev, periods: newPeriods };
       });
@@ -193,14 +281,25 @@ const EntityEditor: React.FC<EntityEditorProps> = ({
         <div className="flex-1 overflow-y-auto p-6 bg-gray-900 custom-scrollbar space-y-6">
             
             {/* General Info */}
-            <div className="bg-gray-800/30 p-4 rounded-lg border border-gray-800">
-                <label className="block text-xs font-medium text-gray-400 mb-1">Entity Name</label>
-                <input 
-                    type="text" 
-                    value={formData.name} 
-                    onChange={e => handleChange('name', e.target.value)}
-                    className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none"
-                />
+            <div className="bg-gray-800/30 p-4 rounded-lg border border-gray-800 space-y-4">
+                <div>
+                    <label className="block text-xs font-medium text-gray-400 mb-1">Entity Name</label>
+                    <input 
+                        type="text" 
+                        value={formData.name} 
+                        onChange={e => handleChange('name', e.target.value)}
+                        className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none"
+                    />
+                </div>
+                <div>
+                    <label className="block text-xs font-medium text-gray-400 mb-1">Description / History</label>
+                    <textarea 
+                        value={formData.description || ''} 
+                        onChange={e => handleChange('description', e.target.value)}
+                        className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none min-h-[80px]"
+                        placeholder="Historical details about this entity..."
+                    />
+                </div>
             </div>
 
             {/* Periods */}
@@ -230,24 +329,24 @@ const EntityEditor: React.FC<EntityEditorProps> = ({
                             {/* Period Basic Info */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                                 <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-[10px] uppercase text-gray-500 font-bold mb-1">Start Year</label>
-                                        <input 
-                                            type="number" 
-                                            value={period.startYear}
-                                            onChange={(e) => updatePeriod(idx, 'startYear', parseInt(e.target.value))}
-                                            className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-sm text-white focus:ring-1 focus:ring-blue-500"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-[10px] uppercase text-gray-500 font-bold mb-1">End Year</label>
-                                        <input 
-                                            type="number" 
-                                            value={period.endYear}
-                                            onChange={(e) => updatePeriod(idx, 'endYear', parseInt(e.target.value))}
-                                            className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-sm text-white focus:ring-1 focus:ring-blue-500"
-                                        />
-                                    </div>
+                                    <DateGroup 
+                                        label="Start Date"
+                                        year={period.startYear}
+                                        month={period.startMonth}
+                                        day={period.startDay}
+                                        onYearChange={(v) => updatePeriod(idx, 'startYear', v)}
+                                        onMonthChange={(v) => updatePeriod(idx, 'startMonth', v)}
+                                        onDayChange={(v) => updatePeriod(idx, 'startDay', v)}
+                                    />
+                                    <DateGroup 
+                                        label="End Date"
+                                        year={period.endYear}
+                                        month={period.endMonth}
+                                        day={period.endDay}
+                                        onYearChange={(v) => updatePeriod(idx, 'endYear', v)}
+                                        onMonthChange={(v) => updatePeriod(idx, 'endMonth', v)}
+                                        onDayChange={(v) => updatePeriod(idx, 'endDay', v)}
+                                    />
                                 </div>
 
                                 {/* Period Color */}
@@ -286,10 +385,15 @@ const EntityEditor: React.FC<EntityEditorProps> = ({
                                     </button>
                                 </div>
                                 <div className="space-y-2">
-                                    {period.contexts.map((ctx, cIdx) => (
-                                        <div key={cIdx} className="grid grid-cols-12 gap-2 items-end">
+                                    {period.contexts.map((ctx, cIdx) => {
+                                        const isActiveContext = activeGroupId && ctx.groupId === activeGroupId;
+                                        return (
+                                        <div 
+                                            key={cIdx} 
+                                            className={`grid grid-cols-12 gap-2 items-end p-1 rounded ${isActiveContext ? 'bg-amber-900/10 border border-amber-500/30' : ''}`}
+                                        >
                                              <div className="col-span-4">
-                                                <label className="text-[9px] text-gray-500 block mb-0.5">Group</label>
+                                                <label className={`text-[9px] block mb-0.5 ${isActiveContext ? 'text-amber-500 font-bold' : 'text-gray-500'}`}>Group</label>
                                                 <select
                                                     value={ctx.groupId}
                                                     onChange={(e) => updateContext(idx, cIdx, 'groupId', e.target.value)}
@@ -330,7 +434,7 @@ const EntityEditor: React.FC<EntityEditorProps> = ({
                                                  </button>
                                              </div>
                                         </div>
-                                    ))}
+                                    )})}
                                     {period.contexts.length === 0 && <div className="text-xs text-gray-600 italic">No contexts defined. Will not appear on timeline.</div>}
                                 </div>
                             </div>
@@ -349,19 +453,25 @@ const EntityEditor: React.FC<EntityEditorProps> = ({
                                     {period.vassalage.map((vassal, vIdx) => (
                                         <div key={vIdx} className="grid grid-cols-12 gap-2 items-end">
                                              <div className="col-span-2">
-                                                <label className="text-[9px] text-gray-500 block mb-0.5">Start</label>
-                                                <input 
-                                                    type="number" value={vassal.startYear}
-                                                    onChange={(e) => updateVassalage(idx, vIdx, 'startYear', parseInt(e.target.value))}
-                                                    className="w-full bg-gray-800 border border-gray-700 rounded p-1 text-xs text-white"
+                                                <DateGroup 
+                                                    label="Start"
+                                                    year={vassal.startYear}
+                                                    month={vassal.startMonth}
+                                                    day={vassal.startDay}
+                                                    onYearChange={(v) => updateVassalage(idx, vIdx, 'startYear', v)}
+                                                    onMonthChange={(v) => updateVassalage(idx, vIdx, 'startMonth', v)}
+                                                    onDayChange={(v) => updateVassalage(idx, vIdx, 'startDay', v)}
                                                 />
                                              </div>
                                              <div className="col-span-2">
-                                                <label className="text-[9px] text-gray-500 block mb-0.5">End</label>
-                                                <input 
-                                                    type="number" value={vassal.endYear}
-                                                    onChange={(e) => updateVassalage(idx, vIdx, 'endYear', parseInt(e.target.value))}
-                                                    className="w-full bg-gray-800 border border-gray-700 rounded p-1 text-xs text-white"
+                                                <DateGroup 
+                                                    label="End"
+                                                    year={vassal.endYear}
+                                                    month={vassal.endMonth}
+                                                    day={vassal.endDay}
+                                                    onYearChange={(v) => updateVassalage(idx, vIdx, 'endYear', v)}
+                                                    onMonthChange={(v) => updateVassalage(idx, vIdx, 'endMonth', v)}
+                                                    onDayChange={(v) => updateVassalage(idx, vIdx, 'endDay', v)}
                                                 />
                                              </div>
                                              <div className="col-span-7">
@@ -369,7 +479,7 @@ const EntityEditor: React.FC<EntityEditorProps> = ({
                                                 <select
                                                     value={vassal.liegeId}
                                                     onChange={(e) => updateVassalage(idx, vIdx, 'liegeId', e.target.value)}
-                                                    className="w-full bg-gray-800 border border-gray-700 rounded p-1 text-xs text-white"
+                                                    className="w-full bg-gray-800 border border-gray-700 rounded p-1 text-xs text-white h-[30px]"
                                                 >
                                                     {entityOptions.map(e => <option key={e.value} value={e.value}>{e.label}</option>)}
                                                 </select>
@@ -392,19 +502,27 @@ const EntityEditor: React.FC<EntityEditorProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-gray-800 bg-gray-950 flex justify-end gap-3">
+        <div className="p-4 border-t border-gray-800 bg-gray-950 flex justify-between gap-3">
             <button 
-                onClick={onCancel}
-                className="px-4 py-2 rounded text-gray-400 hover:bg-gray-800 hover:text-white text-sm font-medium transition-colors"
+                onClick={() => onDelete(formData.id)}
+                className="px-4 py-2 rounded text-red-500 hover:bg-red-900/20 hover:text-red-400 text-sm font-medium transition-colors flex items-center gap-1"
             >
-                Cancel
+                <Trash2 size={16} /> Delete
             </button>
-            <button 
-                onClick={() => onSave(formData)}
-                className="px-6 py-2 rounded bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold shadow-lg shadow-blue-900/20 flex items-center gap-2 transition-colors"
-            >
-                <Save size={16} /> Save Changes
-            </button>
+            <div className="flex gap-3">
+                <button 
+                    onClick={onCancel}
+                    className="px-4 py-2 rounded text-gray-400 hover:bg-gray-800 hover:text-white text-sm font-medium transition-colors"
+                >
+                    Cancel
+                </button>
+                <button 
+                    onClick={() => onSave(formData)}
+                    className="px-6 py-2 rounded bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold shadow-lg shadow-blue-900/20 flex items-center gap-2 transition-colors"
+                >
+                    <Save size={16} /> Save Changes
+                </button>
+            </div>
         </div>
 
       </div>

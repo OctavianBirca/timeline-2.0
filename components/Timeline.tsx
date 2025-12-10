@@ -2,6 +2,7 @@
 import React, { useMemo, useRef } from 'react';
 import { Person, PoliticalEntity, ViewSettings, Dynasty, CharacterRole, HistoricalGroup } from '../types';
 import CharacterNode from './CharacterNode';
+import { Info } from 'lucide-react';
 
 interface TimelineProps {
   settings: ViewSettings;
@@ -14,6 +15,7 @@ interface TimelineProps {
   hiddenEntityIds: string[];
   updatePerson: (person: Person) => void;
   onToggleFamily: (id: string, type: 'ancestors' | 'descendants' | 'spouses') => void;
+  onViewInfo: (type: 'person' | 'entity', id: string) => void;
 }
 
 const Timeline: React.FC<TimelineProps> = ({
@@ -26,7 +28,8 @@ const Timeline: React.FC<TimelineProps> = ({
   activeGroupIds,
   hiddenEntityIds,
   updatePerson,
-  onToggleFamily
+  onToggleFamily,
+  onViewInfo
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   
@@ -37,16 +40,16 @@ const Timeline: React.FC<TimelineProps> = ({
   const TOP_RULER_HEIGHT = 40;
   const BOTTOM_RULER_HEIGHT = 40;
   
-  const BASE_SLOT_HEIGHT = 140;
+  const BASE_SLOT_HEIGHT = 100; // Reduced from 140
   const SLOT_HEIGHT = BASE_SLOT_HEIGHT * globalScale; // Vertical height per character row
   
   const BASE_ENTITY_LAYER_HEIGHT = 220;
   const ENTITY_LAYER_HEIGHT = BASE_ENTITY_LAYER_HEIGHT * globalScale; // Vertical height per entity layer
 
   // Image sizes matching CharacterNode.tsx (Scaled)
-  const IMG_SIZE_NUCLEUS = 60 * globalScale;
-  const IMG_SIZE_SECONDARY = 45 * globalScale;
-  const IMG_SIZE_TERTIARY = 30 * globalScale;
+  const IMG_SIZE_NUCLEUS = 40 * globalScale; // Reduced from 60
+  const IMG_SIZE_SECONDARY = 30 * globalScale; // Reduced from 45
+  const IMG_SIZE_TERTIARY = 20 * globalScale; // Reduced from 30
 
   // --- Dimensions & Scales ---
   const totalYears = maxYear - minYear;
@@ -64,11 +67,6 @@ const Timeline: React.FC<TimelineProps> = ({
 
         for(const period of entity.periods) {
             // Check if period has ANY context matching ANY active group
-            // If multiple contexts match multiple active groups, we should probably prefer the most significant one
-            // or render multiple blocks? For simplicity, we iterate contexts and add matches.
-            // If the same period matches multiple active groups, it will appear multiple times.
-            // This allows overlap visualization if they have different roles/heights in different contexts.
-            
             for (const context of period.contexts) {
                 if (activeGroupIds.includes(context.groupId)) {
                     flat.push({
@@ -100,25 +98,36 @@ const Timeline: React.FC<TimelineProps> = ({
   
   // Calculate Person Y based on their Title relationship to the active entities
   const getPersonY = (person: Person): number => {
-      // 1. Try to find a title associated with an entity visible in the current activeGroupIds
-      // Sort titles by importance (Nucleus first) to pick the best anchor
-      const relevantTitle = person.titles
-        .sort((a, b) => {
-             const roleScore = (r: CharacterRole) => r === CharacterRole.NUCLEUS ? 2 : r === CharacterRole.SECONDARY ? 1 : 0;
-             return roleScore(b.role) - roleScore(a.role);
-        })
-        .find(t => {
+      // 1. Filter titles that belong to entities visible in current activeGroupIds
+      const validTitles = person.titles.filter(t => {
           const entity = entities.find(e => e.id === t.entityId);
-          if(!entity) return false;
-          // Check if this entity has a period in ANY active context intersecting person's life
-          // And is not hidden
-          if (hiddenEntityIds.includes(entity.id)) return false;
+          if (!entity || hiddenEntityIds.includes(entity.id)) return false;
 
+          // Check if entity has a period in ANY active context intersecting person's life
           return entity.periods.some(ep => 
               ep.contexts.some(c => activeGroupIds.includes(c.groupId)) && 
               Math.max(ep.startYear, person.birthYear) < Math.min(ep.endYear, person.deathYear)
           );
       });
+
+      // 2. Sort valid titles by RANK (Ascending: 0 is highest) then by Role
+      validTitles.sort((a, b) => {
+          // Primary Sort: Rank Level (Numeric, lower is better)
+          // Default to 99 if undefined/null to push to bottom
+          const rankA = a.rank !== undefined ? a.rank : 99;
+          const rankB = b.rank !== undefined ? b.rank : 99;
+          
+          if (rankA !== rankB) {
+              return rankA - rankB;
+          }
+
+          // Secondary Sort: Role (Nucleus > Secondary > Tertiary)
+          const roleScore = (r: CharacterRole) => r === CharacterRole.NUCLEUS ? 2 : r === CharacterRole.SECONDARY ? 1 : 0;
+          return roleScore(b.role) - roleScore(a.role);
+      });
+
+      // 3. Use the highest ranked valid title for positioning
+      const relevantTitle = validTitles[0];
 
       if (relevantTitle) {
           const entity = entities.find(e => e.id === relevantTitle.entityId);
@@ -393,7 +402,6 @@ const Timeline: React.FC<TimelineProps> = ({
       if(!p) return;
 
       // 1 unit of vertical shift is approximately IMG_SIZE_NUCLEUS * 1.5 pixels
-      // e.g. 60 * 1.5 = 90px
       const unitPixels = IMG_SIZE_NUCLEUS * 1.5;
       const deltaUnits = deltaPixels / unitPixels;
 
@@ -487,8 +495,8 @@ const Timeline: React.FC<TimelineProps> = ({
                       return (
                         <div
                           key={`${period.entityId}-${period.periodId}-${i}`}
-                          title={`${period.name} (${period.startYear} - ${period.endYear})`}
-                          className={`absolute rounded-md flex flex-col justify-center text-white/40 font-bold uppercase tracking-widest text-lg overflow-hidden pointer-events-auto hover:bg-white/5 transition-colors`}
+                          title={`${period.name}\n(${period.startYear} – ${period.endYear})`}
+                          className={`absolute rounded-md flex flex-col justify-center text-white/40 font-bold uppercase tracking-widest text-lg overflow-hidden pointer-events-auto hover:bg-white/5 transition-colors group/entity`}
                           style={{
                             left: x,
                             width: w,
@@ -500,6 +508,17 @@ const Timeline: React.FC<TimelineProps> = ({
                             alignItems: 'center'
                           }}
                         >
+                          {/* Info Button for Entity */}
+                          <div className="absolute top-2 right-2 opacity-0 group-hover/entity:opacity-100 transition-opacity z-20">
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); onViewInfo('entity', period.entityId); }}
+                                    className="p-1.5 bg-gray-900/80 hover:bg-black text-white rounded-full border border-gray-600"
+                                    title="Read Info"
+                                >
+                                    <Info size={14 * globalScale} />
+                                </button>
+                          </div>
+
                           {/* Main Entity Block Content */}
                           {showText && (
                             <div className="sticky left-1/2 -translate-x-1/2 flex flex-col items-center text-center max-w-[95%] py-2 z-10">
@@ -518,12 +537,14 @@ const Timeline: React.FC<TimelineProps> = ({
                               const vx = (vStart - period.startYear) * settings.zoom;
                               const vw = (vEnd - vStart) * settings.zoom;
                               
+                              const liegeName = entities.find(e => e.id === vassal.liegeId)?.name || 'Unknown';
+
                               return (
                                   <div 
                                     key={`vas-${vIdx}`}
                                     className="absolute top-0 bottom-0 pattern-diagonal-lines border-x border-white/20"
                                     style={{ left: vx, width: vw }}
-                                    title={`Vassal to ${entities.find(e => e.id === vassal.liegeId)?.name || 'Unknown'}`}
+                                    title={`${period.name}\nVassal of: ${liegeName}\n(${vassal.startYear} – ${vassal.endYear})`}
                                   />
                               );
                           })}
@@ -575,6 +596,7 @@ const Timeline: React.FC<TimelineProps> = ({
                         onToggleHide={handleToggleHide}
                         onPositionChange={handlePositionChange}
                         onToggleFamily={onToggleFamily}
+                        onViewInfo={(id) => onViewInfo('person', id)}
                         scale={globalScale}
                       />
                     );

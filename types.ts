@@ -60,14 +60,22 @@ export interface EntityContextRole {
 
 export interface EntityVassalage {
   startYear: number;
+  startMonth?: number;
+  startDay?: number;
   endYear: number;
+  endMonth?: number;
+  endDay?: number;
   liegeId: string; // Entity ID of the liege
 }
 
 export interface EntityPeriod {
   id: string; // Unique ID for keying
   startYear: number;
+  startMonth?: number;
+  startDay?: number;
   endYear: number;
+  endMonth?: number;
+  endDay?: number;
   color: string;
   contexts: EntityContextRole[]; // How this period appears in different history groups
   vassalage: EntityVassalage[];
@@ -76,6 +84,7 @@ export interface EntityPeriod {
 export interface PoliticalEntity {
   id: string;
   name: string;
+  description?: string;
   periods: EntityPeriod[];
 }
 
@@ -118,6 +127,7 @@ export interface Person {
   verticalPosition: number; // Fallback position
   isHidden?: boolean;
   color?: string; 
+  description?: string;
 }
 
 export interface ViewSettings {

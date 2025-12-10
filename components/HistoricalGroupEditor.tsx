@@ -1,16 +1,19 @@
+
 import React, { useState } from 'react';
 import { HistoricalGroup } from '../types';
-import { X, Save, FolderTree } from 'lucide-react';
+import { X, Save, FolderTree, Trash2 } from 'lucide-react';
 
 interface HistoricalGroupEditorProps {
   group: HistoricalGroup;
   onSave: (updatedGroup: HistoricalGroup) => void;
+  onDelete: (id: string) => void;
   onCancel: () => void;
 }
 
 const HistoricalGroupEditor: React.FC<HistoricalGroupEditorProps> = ({
   group,
   onSave,
+  onDelete,
   onCancel
 }) => {
   const [formData, setFormData] = useState<HistoricalGroup>({ ...group });
@@ -64,19 +67,27 @@ const HistoricalGroupEditor: React.FC<HistoricalGroupEditorProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-gray-800 bg-gray-950 flex justify-end gap-3">
+        <div className="p-4 border-t border-gray-800 bg-gray-950 flex justify-between gap-3">
             <button 
-                onClick={onCancel}
-                className="px-4 py-2 rounded text-gray-400 hover:bg-gray-800 hover:text-white text-sm font-medium transition-colors"
+                onClick={() => onDelete(formData.id)}
+                className="px-4 py-2 rounded text-red-500 hover:bg-red-900/20 hover:text-red-400 text-sm font-medium transition-colors flex items-center gap-1"
             >
-                Cancel
+                <Trash2 size={16} /> Delete
             </button>
-            <button 
-                onClick={() => onSave(formData)}
-                className="px-6 py-2 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold shadow-lg shadow-indigo-900/20 flex items-center gap-2 transition-colors"
-            >
-                <Save size={16} /> Save Changes
-            </button>
+            <div className="flex gap-3">
+                <button 
+                    onClick={onCancel}
+                    className="px-4 py-2 rounded text-gray-400 hover:bg-gray-800 hover:text-white text-sm font-medium transition-colors"
+                >
+                    Cancel
+                </button>
+                <button 
+                    onClick={() => onSave(formData)}
+                    className="px-6 py-2 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold shadow-lg shadow-indigo-900/20 flex items-center gap-2 transition-colors"
+                >
+                    <Save size={16} /> Save Changes
+                </button>
+            </div>
         </div>
       </div>
     </div>

@@ -8,6 +8,7 @@ import EntityEditor from './components/EntityEditor';
 import TitleDefinitionEditor from './components/TitleDefinitionEditor';
 import DynastyEditor from './components/DynastyEditor';
 import HistoricalGroupEditor from './components/HistoricalGroupEditor';
+import InfoModal from './components/InfoModal';
 import { 
   Person, PoliticalEntity, Dynasty, HistoricalGroup, TitleDefinition, ViewSettings, 
   CharacterRole, RankLevel 
@@ -50,6 +51,13 @@ const App: React.FC = () => {
   const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
   const [editingDynastyId, setEditingDynastyId] = useState<string | null>(null);
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
+
+  // Info Viewing State
+  const [viewingInfoItem, setViewingInfoItem] = useState<{
+      type: 'person' | 'entity';
+      data: Person | PoliticalEntity;
+      sections?: { title: string; content: React.ReactNode }[];
+  } | null>(null);
 
   // New person state (temporarily holds new person object before save)
   const [editingPerson, setEditingPerson] = useState<Person | null>(null);
@@ -156,6 +164,98 @@ const App: React.FC = () => {
       }
   };
 
+  const handleViewInfo = (type: 'person' | 'entity', id: string) => {
+      if (type === 'person') {
+          const p = people.find(item => item.id === id);
+          if (p) {
+              const sections = [];
+              
+              // 1. Parents
+              const father = people.find(x => x.id === p.fatherId);
+              const mother = people.find(x => x.id === p.motherId);
+              const adopted = people.find(x => x.id === p.adoptedParentId);
+              
+              if (father || mother || adopted) {
+                  sections.push({
+                      title: 'Parents',
+                      content: (
+                          <div className="flex flex-col gap-1">
+                              {father && <div>Father: <span className="text-amber-500">{father.officialName}</span></div>}
+                              {mother && <div>Mother: <span className="text-pink-500">{mother.officialName}</span></div>}
+                              {adopted && <div>Adopted Parent: <span className="text-blue-500">{adopted.officialName}</span></div>}
+                          </div>
+                      )
+                  });
+              }
+
+              // 2. Spouses
+              const spouseIds = [...(p.spouseIds || [])];
+              // Reverse lookup
+              people.forEach(other => {
+                  if (other.spouseIds?.includes(p.id) && !spouseIds.includes(other.id)) {
+                      spouseIds.push(other.id);
+                  }
+              });
+
+              if (spouseIds.length > 0) {
+                   const spouseObjs = people.filter(x => spouseIds.includes(x.id));
+                   sections.push({
+                       title: 'Spouses',
+                       content: (
+                           <div className="flex flex-wrap gap-2">
+                               {spouseObjs.map(s => (
+                                   <span key={s.id} className="bg-gray-800 px-2 py-1 rounded text-xs">{s.officialName}</span>
+                               ))}
+                           </div>
+                       )
+                   });
+              }
+
+              // 3. Children
+              const children = people.filter(x => x.fatherId === p.id || x.motherId === p.id);
+              if (children.length > 0) {
+                  sections.push({
+                      title: `Children (${children.length})`,
+                      content: (
+                          <div className="flex flex-wrap gap-2">
+                               {children.map(c => (
+                                   <span key={c.id} className="bg-gray-800 px-2 py-1 rounded text-xs border border-gray-700">{c.officialName}</span>
+                               ))}
+                          </div>
+                      )
+                  });
+              }
+
+              // 4. Titles
+              if (p.titles && p.titles.length > 0) {
+                  sections.push({
+                      title: 'Titles & Positions',
+                      content: (
+                          <div className="space-y-2">
+                              {p.titles.map((t, idx) => {
+                                  // Find entity name
+                                  const entity = entities.find(e => e.id === t.entityId);
+                                  const years = t.periods.map(per => `${per.startYear}-${per.endYear}`).join(', ');
+                                  return (
+                                      <div key={idx} className="flex flex-col">
+                                          <div className="font-bold text-amber-400">{t.name}</div>
+                                          <div className="text-xs text-gray-500">{entity?.name || 'Unknown Entity'} • {years}</div>
+                                      </div>
+                                  )
+                              })}
+                          </div>
+                      )
+                  });
+              }
+
+              setViewingInfoItem({ type: 'person', data: p, sections });
+          }
+      } else {
+          const e = entities.find(item => item.id === id);
+          if (e) setViewingInfoItem({ type: 'entity', data: e });
+      }
+  };
+
   // Handlers for Add/Edit
   const handleAddNew = (type: string) => {
       if (type === 'people') {
@@ -231,6 +331,13 @@ const App: React.FC = () => {
       setEditingPerson(null);
   };
 
+  const handleDeletePerson = (id: string) => {
+      if (window.confirm("Are you sure you want to delete this person?")) {
+          setPeople(prev => prev.filter(p => p.id !== id));
+          setEditingPerson(null);
+      }
+  };
+
   const handleEditEntity = (id: string) => {
       const e = entities.find(entity => entity.id === id);
       if (e) setEditingEntity({ ...e });
@@ -246,6 +353,34 @@ const App: React.FC = () => {
           }
       });
       setEditingEntity(null);
+  };
+
+  const handleDeleteEntity = (id: string) => {
+      if (window.confirm("Are you sure you want to delete this entity?")) {
+          setEntities(prev => prev.filter(e => e.id !== id));
+          setEditingEntity(null);
+      }
+  };
+
+  const handleDeleteTitleDefinition = (id: string) => {
+      if (window.confirm("Are you sure you want to delete this title definition?")) {
+          setTitleDefinitions(prev => prev.filter(t => t.id !== id));
+          setEditingTitleId(null);
+      }
+  };
+
+  const handleDeleteDynasty = (id: string) => {
+      if (window.confirm("Are you sure you want to delete this dynasty?")) {
+          setDynasties(prev => prev.filter(d => d.id !== id));
+          setEditingDynastyId(null);
+      }
+  };
+
+  const handleDeleteGroup = (id: string) => {
+      if (window.confirm("Are you sure you want to delete this historical group?")) {
+          setGroups(prev => prev.filter(g => g.id !== id));
+          setEditingGroupId(null);
+      }
   };
 
   return (
@@ -293,10 +428,25 @@ const App: React.FC = () => {
             hiddenEntityIds={hiddenEntityIds}
             updatePerson={updatePerson}
             onToggleFamily={handleToggleFamily}
+            onViewInfo={handleViewInfo}
          />
       </div>
 
       {/* Modals */}
+      {viewingInfoItem && (
+          <InfoModal
+             title={viewingInfoItem.type === 'person' ? (viewingInfoItem.data as Person).officialName : (viewingInfoItem.data as PoliticalEntity).name}
+             subtitle={viewingInfoItem.type === 'person' 
+                ? `${(viewingInfoItem.data as Person).birthYear} – ${(viewingInfoItem.data as Person).deathYear}` 
+                : `${(viewingInfoItem.data as PoliticalEntity).periods.length} Periods`}
+             description={viewingInfoItem.data.description}
+             imageUrl={(viewingInfoItem.data as any).imageUrl}
+             color={(viewingInfoItem.data as any).periods?.[0]?.color}
+             sections={viewingInfoItem.sections}
+             onClose={() => setViewingInfoItem(null)}
+          />
+      )}
+
       {editingPerson && (
           <PersonEditor 
             person={editingPerson}
@@ -305,6 +455,7 @@ const App: React.FC = () => {
             entities={entities}
             titleDefinitions={titleDefinitions}
             onSave={handleSavePerson}
+            onDelete={handleDeletePerson}
             onCancel={() => setEditingPerson(null)}
           />
       )}
@@ -316,6 +467,7 @@ const App: React.FC = () => {
              groups={groups}
              activeGroupId={activeGroupIds[0]} // Pass the first active group as default context
              onSave={handleSaveEntity}
+             onDelete={handleDeleteEntity}
              onCancel={() => setEditingEntity(null)}
           />
       )}
@@ -324,6 +476,7 @@ const App: React.FC = () => {
           <TitleDefinitionEditor 
             titleDef={titleDefinitions.find(t => t.id === editingTitleId)!}
             onSave={(updated) => { setTitleDefinitions(prev => prev.map(t => t.id === updated.id ? updated : t)); setEditingTitleId(null); }}
+            onDelete={handleDeleteTitleDefinition}
             onCancel={() => setEditingTitleId(null)}
           />
       )}
@@ -332,6 +485,7 @@ const App: React.FC = () => {
           <DynastyEditor 
             dynasty={dynasties.find(d => d.id === editingDynastyId)!}
             onSave={(updated) => { setDynasties(prev => prev.map(d => d.id === updated.id ? updated : d)); setEditingDynastyId(null); }}
+            onDelete={handleDeleteDynasty}
             onCancel={() => setEditingDynastyId(null)}
           />
       )}
@@ -340,6 +494,7 @@ const App: React.FC = () => {
           <HistoricalGroupEditor 
             group={groups.find(g => g.id === editingGroupId)!}
             onSave={(updated) => { setGroups(prev => prev.map(g => g.id === updated.id ? updated : g)); setEditingGroupId(null); }}
+            onDelete={handleDeleteGroup}
             onCancel={() => setEditingGroupId(null)}
           />
       )}
