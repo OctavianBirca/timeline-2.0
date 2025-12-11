@@ -18,6 +18,35 @@ import {
   PIXELS_PER_YEAR_DEFAULT, MIN_YEAR, MAX_YEAR 
 } from './constants';
 
+// Helper component for Person Chip in Info Modal
+const PersonChip: React.FC<{
+  person: Person;
+  roleLabel?: string;
+  onNavigate: (id: string) => void;
+}> = ({ person, roleLabel, onNavigate }) => (
+  <button 
+      onClick={() => onNavigate(person.id)}
+      className="flex items-center gap-3 bg-gray-800 hover:bg-gray-700 p-2 pr-4 rounded-lg border border-gray-700 hover:border-amber-500/50 transition-all group w-full text-left"
+  >
+      <div className="w-10 h-10 rounded-full bg-gray-700 overflow-hidden border-2 border-gray-600 group-hover:border-amber-500 shrink-0">
+          {person.imageUrl ? (
+              <img src={person.imageUrl} alt={person.officialName} className="w-full h-full object-cover" />
+          ) : (
+              <div className="w-full h-full flex items-center justify-center text-xs text-gray-500 font-bold">?</div>
+          )}
+      </div>
+      <div className="flex-1 min-w-0">
+          {roleLabel && <div className="text-[10px] uppercase text-gray-500 font-bold mb-0.5">{roleLabel}</div>}
+          <div className="text-sm font-bold text-gray-200 group-hover:text-amber-400 truncate">
+              {person.officialName}
+          </div>
+          <div className="text-xs text-gray-600 truncate">
+              {person.birthYear} – {person.deathYear}
+          </div>
+      </div>
+  </button>
+);
+
 const App: React.FC = () => {
   // State
   const [people, setPeople] = useState<Person[]>(MOCK_PEOPLE);
@@ -169,6 +198,7 @@ const App: React.FC = () => {
           const p = people.find(item => item.id === id);
           if (p) {
               const sections = [];
+              const navigate = (targetId: string) => handleViewInfo('person', targetId);
               
               // 1. Parents
               const father = people.find(x => x.id === p.fatherId);
@@ -179,10 +209,10 @@ const App: React.FC = () => {
                   sections.push({
                       title: 'Parents',
                       content: (
-                          <div className="flex flex-col gap-1">
-                              {father && <div>Father: <span className="text-amber-500">{father.officialName}</span></div>}
-                              {mother && <div>Mother: <span className="text-pink-500">{mother.officialName}</span></div>}
-                              {adopted && <div>Adopted Parent: <span className="text-blue-500">{adopted.officialName}</span></div>}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {father && <PersonChip person={father} roleLabel="Father" onNavigate={navigate} />}
+                              {mother && <PersonChip person={mother} roleLabel="Mother" onNavigate={navigate} />}
+                              {adopted && <PersonChip person={adopted} roleLabel="Adopted" onNavigate={navigate} />}
                           </div>
                       )
                   });
@@ -190,7 +220,7 @@ const App: React.FC = () => {
 
               // 2. Spouses
               const spouseIds = [...(p.spouseIds || [])];
-              // Reverse lookup
+              // Reverse lookup for spouses who listed this person but weren't listed back
               people.forEach(other => {
                   if (other.spouseIds?.includes(p.id) && !spouseIds.includes(other.id)) {
                       spouseIds.push(other.id);
@@ -200,11 +230,11 @@ const App: React.FC = () => {
               if (spouseIds.length > 0) {
                    const spouseObjs = people.filter(x => spouseIds.includes(x.id));
                    sections.push({
-                       title: 'Spouses',
+                       title: `Spouses (${spouseObjs.length})`,
                        content: (
-                           <div className="flex flex-wrap gap-2">
+                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                {spouseObjs.map(s => (
-                                   <span key={s.id} className="bg-gray-800 px-2 py-1 rounded text-xs">{s.officialName}</span>
+                                   <PersonChip key={s.id} person={s} onNavigate={navigate} />
                                ))}
                            </div>
                        )
@@ -213,13 +243,16 @@ const App: React.FC = () => {
 
               // 3. Children
               const children = people.filter(x => x.fatherId === p.id || x.motherId === p.id);
+              // Sort children by birth year
+              children.sort((a, b) => a.birthYear - b.birthYear);
+
               if (children.length > 0) {
                   sections.push({
                       title: `Children (${children.length})`,
                       content: (
-                          <div className="flex flex-wrap gap-2">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                {children.map(c => (
-                                   <span key={c.id} className="bg-gray-800 px-2 py-1 rounded text-xs border border-gray-700">{c.officialName}</span>
+                                   <PersonChip key={c.id} person={c} onNavigate={navigate} />
                                ))}
                           </div>
                       )
@@ -231,15 +264,26 @@ const App: React.FC = () => {
                   sections.push({
                       title: 'Titles & Positions',
                       content: (
-                          <div className="space-y-2">
+                          <div className="space-y-3">
                               {p.titles.map((t, idx) => {
                                   // Find entity name
                                   const entity = entities.find(e => e.id === t.entityId);
                                   const years = t.periods.map(per => `${per.startYear}-${per.endYear}`).join(', ');
                                   return (
-                                      <div key={idx} className="flex flex-col">
-                                          <div className="font-bold text-amber-400">{t.name}</div>
-                                          <div className="text-xs text-gray-500">{entity?.name || 'Unknown Entity'} • {years}</div>
+                                      <div key={idx} className="bg-gray-800/50 p-3 rounded border-l-4 border-amber-600 flex flex-col">
+                                          <div className="font-bold text-gray-200">{t.name}</div>
+                                          <div className="text-xs text-gray-500 mt-1 flex items-center flex-wrap gap-2">
+                                              {entity ? (
+                                                  <button 
+                                                    onClick={() => handleViewInfo('entity', entity.id)}
+                                                    className="bg-gray-800 hover:bg-gray-700 px-2 py-0.5 rounded border border-gray-600 text-blue-400 hover:text-blue-300 transition-colors"
+                                                  >
+                                                      {entity.name}
+                                                  </button>
+                                              ) : <span className="italic">Unknown Entity</span>}
+                                              <span className="text-gray-600">|</span>
+                                              <span className="font-mono text-gray-400">{years}</span>
+                                          </div>
                                       </div>
                                   )
                               })}

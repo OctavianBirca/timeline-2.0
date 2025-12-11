@@ -537,21 +537,21 @@ const Timeline: React.FC<TimelineProps> = ({
                           }}
                         >
                           {/* Info Button for Entity */}
-                          <div className="absolute top-2 right-2 opacity-0 group-hover/entity:opacity-100 transition-opacity z-20">
+                          <div className="absolute top-1 right-1 z-20">
                                 <button 
                                     onClick={(e) => { e.stopPropagation(); onViewInfo('entity', period.entityId); }}
-                                    className="p-1.5 bg-gray-900/80 hover:bg-black text-white rounded-full border border-gray-600"
-                                    title="Read Info"
+                                    className="p-1 bg-black/20 hover:bg-black/60 text-white/50 hover:text-white rounded-full transition-colors backdrop-blur-sm"
+                                    title="Info"
                                 >
-                                    <Info size={14 * globalScale} />
+                                    <Info size={12 * globalScale} />
                                 </button>
                           </div>
 
-                          {/* Main Entity Block Content */}
+                          {/* Main Entity Block Content - Centered strictly relative to container */}
                           {showText && (
-                            <div className="sticky left-1/2 -translate-x-1/2 flex flex-col items-center text-center max-w-[95%] py-2 z-10">
-                                <span className="whitespace-normal leading-tight">{period.name}</span>
-                                <span className="text-[0.7em] opacity-70 whitespace-nowrap mt-1">{period.startYear} – {period.endYear}</span>
+                            <div className="flex flex-col items-center text-center max-w-[95%] py-2 z-10 pointer-events-none">
+                                <span className="whitespace-normal leading-tight text-white/40 font-black drop-shadow-sm">{period.name}</span>
+                                <span className="text-[0.75em] whitespace-nowrap mt-0.5 font-mono text-white/30 drop-shadow-sm">{period.startYear} – {period.endYear}</span>
                             </div>
                           )}
                           

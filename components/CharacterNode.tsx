@@ -125,9 +125,19 @@ const CharacterNode: React.FC<CharacterNodeProps> = ({
       return `${years} years`;
   }, [person]);
 
-  // Sort titles by positionIndex for correct vertical stacking
+  // Sort titles by Rank (asc) then positionIndex for correct vertical stacking
+  // Rank 0 (Pope) > Rank 2 (King) > Rank 3 (Duke)
   const sortedTitles = useMemo(() => {
-      return [...person.titles].sort((a, b) => (a.positionIndex || 0) - (b.positionIndex || 0));
+      return [...person.titles].sort((a, b) => {
+          const rankA = a.rank ?? 99;
+          const rankB = b.rank ?? 99;
+          
+          if (rankA !== rankB) {
+              return rankA - rankB; // Lower number = Higher rank = Higher in list
+          }
+          
+          return (a.positionIndex || 0) - (b.positionIndex || 0);
+      });
   }, [person.titles]);
 
   // Layout calculations based on scale
