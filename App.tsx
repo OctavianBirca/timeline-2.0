@@ -34,8 +34,8 @@ const App: React.FC = () => {
   
   const [settings, setViewSettings] = useState<ViewSettings>({
     zoom: PIXELS_PER_YEAR_DEFAULT,
-    showLifespans: true,
-    showSecondary: true,
+    showLifespans: false,
+    showSecondary: false,
     showTertiary: false,
     showGrid: true,
     showMarriages: true,

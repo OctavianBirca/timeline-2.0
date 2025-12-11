@@ -1,10 +1,11 @@
 
+
 import { CharacterRole, Dynasty, Person, PoliticalEntity, RankLevel, HistoricalGroup } from './types';
 
 export const PIXELS_PER_YEAR_DEFAULT = 10;
 export const MIN_YEAR = 450;
 export const MAX_YEAR = 850;
-export const SLOT_HEIGHT = 140; 
+export const SLOT_HEIGHT = 90; 
 
 export const LABELS = {
   en: {
@@ -89,31 +90,31 @@ export const MOCK_ENTITIES: PoliticalEntity[] = [
     periods: [
       {
         id: 'p_kf_1', startYear: 481, endYear: 511, color: 'rgba(5, 150, 105, 0.4)', // Emerald 600
-        contexts: [franceContext(CharacterRole.NUCLEUS, 0, 4)], vassalage: []
+        contexts: [franceContext(CharacterRole.NUCLEUS, 0, 1)], vassalage: []
       },
       {
         id: 'p_kf_2', startYear: 558, endYear: 561, color: 'rgba(5, 150, 105, 0.4)',
-        contexts: [franceContext(CharacterRole.NUCLEUS, 0, 4)], vassalage: []
+        contexts: [franceContext(CharacterRole.NUCLEUS, 0, 1)], vassalage: []
       },
       {
         id: 'p_kf_3', startYear: 613, endYear: 639, color: 'rgba(5, 150, 105, 0.4)',
-        contexts: [franceContext(CharacterRole.NUCLEUS, 0, 4)], vassalage: []
+        contexts: [franceContext(CharacterRole.NUCLEUS, 0, 1)], vassalage: []
       },
       {
         id: 'p_kf_4', startYear: 673, endYear: 675, color: 'rgba(5, 150, 105, 0.4)',
-        contexts: [franceContext(CharacterRole.NUCLEUS, 0, 4)], vassalage: []
+        contexts: [franceContext(CharacterRole.NUCLEUS, 0, 1)], vassalage: []
       },
       {
         id: 'p_kf_5', startYear: 679, endYear: 715, color: 'rgba(5, 150, 105, 0.4)',
-        contexts: [franceContext(CharacterRole.NUCLEUS, 0, 4)], vassalage: []
+        contexts: [franceContext(CharacterRole.NUCLEUS, 0, 1)], vassalage: []
       },
       {
         id: 'p_kf_6', startYear: 719, endYear: 768, color: 'rgba(5, 150, 105, 0.4)',
-        contexts: [franceContext(CharacterRole.NUCLEUS, 0, 4)], vassalage: []
+        contexts: [franceContext(CharacterRole.NUCLEUS, 0, 1)], vassalage: []
       },
       {
         id: 'p_kf_7', startYear: 771, endYear: 814, color: 'rgba(5, 150, 105, 0.4)',
-        contexts: [franceContext(CharacterRole.NUCLEUS, 0, 4)], vassalage: []
+        contexts: [franceContext(CharacterRole.NUCLEUS, 0, 1)], vassalage: []
       }
     ]
   },
@@ -124,27 +125,27 @@ export const MOCK_ENTITIES: PoliticalEntity[] = [
     periods: [
       {
         id: 'p_kn_1', startYear: 511, endYear: 558, color: 'rgba(13, 148, 136, 0.4)', // Teal 600
-        contexts: [franceContext(CharacterRole.SECONDARY, 0, 2)], vassalage: []
+        contexts: [franceContext(CharacterRole.SECONDARY, 0, 1)], vassalage: []
       },
       {
         id: 'p_kn_2', startYear: 561, endYear: 613, color: 'rgba(13, 148, 136, 0.4)',
-        contexts: [franceContext(CharacterRole.SECONDARY, 0, 2)], vassalage: []
+        contexts: [franceContext(CharacterRole.SECONDARY, 0, 1)], vassalage: []
       },
       {
         id: 'p_kn_3', startYear: 639, endYear: 673, color: 'rgba(13, 148, 136, 0.4)',
-        contexts: [franceContext(CharacterRole.SECONDARY, 0, 2)], vassalage: []
+        contexts: [franceContext(CharacterRole.SECONDARY, 0, 1)], vassalage: []
       },
       {
         id: 'p_kn_4', startYear: 675, endYear: 679, color: 'rgba(13, 148, 136, 0.4)',
-        contexts: [franceContext(CharacterRole.SECONDARY, 0, 2)], vassalage: []
+        contexts: [franceContext(CharacterRole.SECONDARY, 0, 1)], vassalage: []
       },
       {
         id: 'p_kn_5', startYear: 715, endYear: 719, color: 'rgba(13, 148, 136, 0.4)',
-        contexts: [franceContext(CharacterRole.SECONDARY, 0, 2)], vassalage: []
+        contexts: [franceContext(CharacterRole.SECONDARY, 0, 1)], vassalage: []
       },
       {
         id: 'p_kn_6', startYear: 768, endYear: 771, color: 'rgba(13, 148, 136, 0.4)',
-        contexts: [franceContext(CharacterRole.SECONDARY, 0, 2)], vassalage: []
+        contexts: [franceContext(CharacterRole.SECONDARY, 0, 1)], vassalage: []
       }
     ]
   },
@@ -170,28 +171,27 @@ export const MOCK_ENTITIES: PoliticalEntity[] = [
       periods: [
           {
               id: 'p_ka_1', startYear: 511, endYear: 555, color: 'rgba(21, 128, 61, 0.4)', // Green 700
-              contexts: [franceContext(CharacterRole.SECONDARY, 2, 2)], vassalage: []
+              contexts: [franceContext(CharacterRole.SECONDARY, 2, 1)], vassalage: []
           },
           {
               id: 'p_ka_2', startYear: 561, endYear: 613, color: 'rgba(21, 128, 61, 0.4)',
-              contexts: [franceContext(CharacterRole.SECONDARY, 2, 2)], vassalage: []
+              contexts: [franceContext(CharacterRole.SECONDARY, 2, 1)], vassalage: []
           },
-          // User input had "539-673", assumed typo for 639-673 to match historical Sigibert III period
           {
               id: 'p_ka_3', startYear: 639, endYear: 673, color: 'rgba(21, 128, 61, 0.4)',
-              contexts: [franceContext(CharacterRole.SECONDARY, 2, 2)], vassalage: []
+              contexts: [franceContext(CharacterRole.SECONDARY, 2, 1)], vassalage: []
           },
           {
               id: 'p_ka_4', startYear: 675, endYear: 679, color: 'rgba(21, 128, 61, 0.4)',
-              contexts: [franceContext(CharacterRole.SECONDARY, 2, 2)], vassalage: []
+              contexts: [franceContext(CharacterRole.SECONDARY, 2, 1)], vassalage: []
           },
           {
               id: 'p_ka_5', startYear: 717, endYear: 719, color: 'rgba(21, 128, 61, 0.4)',
-              contexts: [franceContext(CharacterRole.SECONDARY, 2, 2)], vassalage: []
+              contexts: [franceContext(CharacterRole.SECONDARY, 2, 1)], vassalage: []
           },
           {
               id: 'p_ka_6', startYear: 768, endYear: 771, color: 'rgba(21, 128, 61, 0.4)',
-              contexts: [franceContext(CharacterRole.SECONDARY, 2, 2)], vassalage: []
+              contexts: [franceContext(CharacterRole.SECONDARY, 2, 1)], vassalage: []
           }
       ]
   },
@@ -347,5 +347,147 @@ export const MOCK_PEOPLE: Person[] = [
       { id: 't2', name: 'King of Neustria', entityId: 'kingdom_neustria', rank: RankLevel.KING, role: CharacterRole.NUCLEUS, periods: [{ startYear: 511, endYear: 558 }], positionIndex: 0, verticalShift: 0 },
       { id: 't3', name: 'King of the Franks', entityId: 'kingdom_franks', rank: RankLevel.KING, role: CharacterRole.NUCLEUS, periods: [{ startYear: 558, endYear: 561 }], positionIndex: 1, verticalShift: 0 }
     ]
+  },
+  {
+      id: 'charibert1',
+      officialName: 'Charibert I',
+      dynastyId: 'merovingian',
+      birthYear: 517,
+      deathYear: 567,
+      fatherId: 'clothar1',
+      spouseIds: [],
+      role: CharacterRole.NUCLEUS,
+      verticalPosition: 0,
+      description: 'King of Paris.',
+      titles: [
+          { 
+              id: 't_chari1', 
+              name: 'King of Paris', 
+              entityId: 'kingdom_paris', 
+              rank: RankLevel.KING, 
+              role: CharacterRole.NUCLEUS, 
+              periods: [{ startYear: 561, endYear: 567 }], 
+              positionIndex: 0, 
+              verticalShift: 0 
+          }
+      ]
+  },
+  {
+      id: 'guntram',
+      officialName: 'Guntram',
+      dynastyId: 'merovingian',
+      birthYear: 532,
+      deathYear: 592,
+      fatherId: 'clothar1',
+      spouseIds: [],
+      role: CharacterRole.NUCLEUS,
+      verticalPosition: 0,
+      description: 'King of Orléans and Burgundy.',
+      titles: [
+          { 
+              id: 't_guntram1', 
+              name: 'King of Orléans', 
+              entityId: 'kingdom_orleans', 
+              rank: RankLevel.KING, 
+              role: CharacterRole.NUCLEUS, 
+              periods: [{ startYear: 561, endYear: 592 }], 
+              positionIndex: 0, 
+              verticalShift: 0 
+          }
+      ]
+  },
+  {
+      id: 'sigebert1',
+      officialName: 'Sigebert I',
+      dynastyId: 'merovingian',
+      birthYear: 535,
+      deathYear: 575,
+      fatherId: 'clothar1',
+      spouseIds: ['brunhilda'],
+      role: CharacterRole.NUCLEUS,
+      verticalPosition: 0,
+      description: 'King of Austrasia.',
+      titles: [
+          { 
+              id: 't_sig1', 
+              name: 'King of Austrasia', 
+              entityId: 'kingdom_austrasia', 
+              rank: RankLevel.KING, 
+              role: CharacterRole.NUCLEUS, 
+              periods: [{ startYear: 561, endYear: 575 }], 
+              positionIndex: 0, 
+              verticalShift: 0 
+          }
+      ]
+  },
+  {
+      id: 'chilperic1',
+      officialName: 'Chilperic I',
+      dynastyId: 'merovingian',
+      birthYear: 539,
+      deathYear: 584,
+      fatherId: 'clothar1',
+      spouseIds: ['fredegund'],
+      role: CharacterRole.NUCLEUS,
+      verticalPosition: 0,
+      description: 'King of Neustria.',
+      titles: [
+          { 
+              id: 't_chil1', 
+              name: 'King of Neustria', 
+              entityId: 'kingdom_neustria', 
+              rank: RankLevel.KING, 
+              role: CharacterRole.NUCLEUS, 
+              periods: [{ startYear: 561, endYear: 584 }], 
+              positionIndex: 0, 
+              verticalShift: 0 
+          }
+      ]
+  },
+  {
+      id: 'brunhilda',
+      officialName: 'Brunhilda',
+      dynastyId: '',
+      birthYear: 543,
+      deathYear: 613,
+      spouseIds: ['sigebert1'],
+      role: CharacterRole.SECONDARY,
+      verticalPosition: 0,
+      description: 'Visigothic princess and Queen of Austrasia.',
+      titles: [
+          { 
+              id: 't_brun1', 
+              name: 'Queen Consort', 
+              entityId: 'kingdom_austrasia', 
+              rank: RankLevel.KING, 
+              role: CharacterRole.SECONDARY, 
+              periods: [{ startYear: 567, endYear: 575 }], 
+              positionIndex: 0, 
+              verticalShift: 1 
+          }
+      ]
+  },
+  {
+      id: 'fredegund',
+      officialName: 'Fredegund',
+      dynastyId: '',
+      birthYear: 545,
+      deathYear: 597,
+      spouseIds: ['chilperic1'],
+      role: CharacterRole.SECONDARY,
+      verticalPosition: 0,
+      description: 'Queen of Neustria.',
+      titles: [
+          { 
+              id: 't_fred1', 
+              name: 'Queen Consort', 
+              entityId: 'kingdom_neustria', 
+              rank: RankLevel.KING, 
+              role: CharacterRole.SECONDARY, 
+              periods: [{ startYear: 567, endYear: 584 }], 
+              positionIndex: 0, 
+              verticalShift: 1 
+          }
+      ]
   }
 ];

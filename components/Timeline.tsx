@@ -40,16 +40,16 @@ const Timeline: React.FC<TimelineProps> = ({
   const TOP_RULER_HEIGHT = 40;
   const BOTTOM_RULER_HEIGHT = 40;
   
-  const BASE_SLOT_HEIGHT = 100; // Reduced from 140
+  const BASE_SLOT_HEIGHT = 60; // Reduced to minimum to remove spacing
   const SLOT_HEIGHT = BASE_SLOT_HEIGHT * globalScale; // Vertical height per character row
   
-  const BASE_ENTITY_LAYER_HEIGHT = 220;
+  const BASE_ENTITY_LAYER_HEIGHT = 160; // Reduced entity layer height
   const ENTITY_LAYER_HEIGHT = BASE_ENTITY_LAYER_HEIGHT * globalScale; // Vertical height per entity layer
 
   // Image sizes matching CharacterNode.tsx (Scaled)
-  const IMG_SIZE_NUCLEUS = 40 * globalScale; // Reduced from 60
-  const IMG_SIZE_SECONDARY = 30 * globalScale; // Reduced from 45
-  const IMG_SIZE_TERTIARY = 20 * globalScale; // Reduced from 30
+  const IMG_SIZE_NUCLEUS = 50 * globalScale; // Increased from 40 to 50
+  const IMG_SIZE_SECONDARY = 30 * globalScale; 
+  const IMG_SIZE_TERTIARY = 20 * globalScale; 
 
   // --- Dimensions & Scales ---
   const totalYears = maxYear - minYear;
@@ -59,6 +59,7 @@ const Timeline: React.FC<TimelineProps> = ({
   // --- Entities & Layout Calculation relative to Active Group ---
   
   // Flatten periods that are relevant to the active contexts (multiple)
+  // UPDATED: Logic to prevent duplicates. Pick the "Best" context if multiple active groups match.
   const activePeriods = useMemo(() => {
      const flat = [];
      for(const entity of entities) {
@@ -66,20 +67,30 @@ const Timeline: React.FC<TimelineProps> = ({
         if (hiddenEntityIds.includes(entity.id)) continue;
 
         for(const period of entity.periods) {
-            // Check if period has ANY context matching ANY active group
-            for (const context of period.contexts) {
-                if (activeGroupIds.includes(context.groupId)) {
-                    flat.push({
-                        entityId: entity.id,
-                        name: entity.name,
-                        periodId: period.id,
-                        startYear: period.startYear,
-                        endYear: period.endYear,
-                        color: period.color,
-                        vassalage: period.vassalage,
-                        ...context // adds role, heightIndex, rowSpan based on THIS context
-                    });
-                }
+            // Find ALL contexts that match ANY currently active group
+            const matchingContexts = period.contexts.filter(c => activeGroupIds.includes(c.groupId));
+
+            if (matchingContexts.length > 0) {
+                // Sort matching contexts to find the most "important" one to render
+                // Priority: NUCLEUS > SECONDARY > TERTIARY
+                // If roles are equal, the first one found (based on activeGroupIds order implicitly) wins
+                matchingContexts.sort((a, b) => {
+                    const score = (r: CharacterRole) => r === CharacterRole.NUCLEUS ? 3 : r === CharacterRole.SECONDARY ? 2 : 1;
+                    return score(b.role) - score(a.role);
+                });
+
+                const bestContext = matchingContexts[0];
+
+                flat.push({
+                    entityId: entity.id,
+                    name: entity.name,
+                    periodId: period.id,
+                    startYear: period.startYear,
+                    endYear: period.endYear,
+                    color: period.color,
+                    vassalage: period.vassalage,
+                    ...bestContext // adds role, heightIndex, rowSpan based on the prioritized context
+                });
             }
         }
      }
@@ -90,11 +101,12 @@ const Timeline: React.FC<TimelineProps> = ({
   // Use a heuristic for content height based on entities, since people are now relative
   const contentHeight = Math.max(
     800,
-    (maxEntityIndex + 2) * ENTITY_LAYER_HEIGHT + 200
+    TOP_RULER_HEIGHT + (maxEntityIndex + 2) * ENTITY_LAYER_HEIGHT + 200
   );
 
   // --- Y Positioning Helpers ---
-  const getEntityY = (index: number) => index * ENTITY_LAYER_HEIGHT + (40 * globalScale);
+  // Position entities tightly after the ruler.
+  const getEntityY = (index: number) => TOP_RULER_HEIGHT + (index * ENTITY_LAYER_HEIGHT);
   
   // Calculate Person Y based on their Title relationship to the active entities
   const getPersonY = (person: Person): number => {
@@ -110,7 +122,7 @@ const Timeline: React.FC<TimelineProps> = ({
           );
       });
 
-      // 2. Sort valid titles by RANK (Ascending: 0 is highest) then by Role
+      // 2. Sort valid titles by RANK (Ascending: 0 is highest) then by START YEAR (Earliest first)
       validTitles.sort((a, b) => {
           // Primary Sort: Rank Level (Numeric, lower is better)
           // Default to 99 if undefined/null to push to bottom
@@ -121,12 +133,14 @@ const Timeline: React.FC<TimelineProps> = ({
               return rankA - rankB;
           }
 
-          // Secondary Sort: Role (Nucleus > Secondary > Tertiary)
-          const roleScore = (r: CharacterRole) => r === CharacterRole.NUCLEUS ? 2 : r === CharacterRole.SECONDARY ? 1 : 0;
-          return roleScore(b.role) - roleScore(a.role);
+          // Secondary Sort: Start Year (Earliest wins)
+          const startA = a.periods.length > 0 ? Math.min(...a.periods.map(p => p.startYear)) : 9999;
+          const startB = b.periods.length > 0 ? Math.min(...b.periods.map(p => p.startYear)) : 9999;
+          
+          return startA - startB;
       });
 
-      // 3. Use the highest ranked valid title for positioning
+      // 3. Use the highest ranked (and earliest) valid title for positioning
       const relevantTitle = validTitles[0];
 
       if (relevantTitle) {
@@ -134,15 +148,27 @@ const Timeline: React.FC<TimelineProps> = ({
           if (entity) {
               // Find the specific period context to get the Entity's Height Index
               // Prefer one that matches an active group
-              const period = entity.periods.find(ep => 
-                  ep.contexts.some(c => activeGroupIds.includes(c.groupId)) &&
-                  Math.max(ep.startYear, person.birthYear) < Math.min(ep.endYear, person.deathYear)
+              // Use the same prioritization logic as activePeriods to align with visual rendering
+              const matchingPeriods = entity.periods.filter(ep => 
+                  Math.max(ep.startYear, person.birthYear) < Math.min(ep.endYear, person.deathYear) &&
+                  ep.contexts.some(c => activeGroupIds.includes(c.groupId))
               );
               
-              if (period) {
-                  const context = period.contexts.find(c => activeGroupIds.includes(c.groupId));
-                  if (context) {
-                      const entityBaseY = getEntityY(context.heightIndex);
+              if (matchingPeriods.length > 0) {
+                  // Find the context within this period that matches the best active group
+                  // We need to match the visual layer logic (Nucleus > Secondary)
+                  const period = matchingPeriods[0]; // Simplification: pick first time-matching period
+                  const matchingContexts = period.contexts.filter(c => activeGroupIds.includes(c.groupId));
+                  
+                  matchingContexts.sort((a, b) => {
+                      const score = (r: CharacterRole) => r === CharacterRole.NUCLEUS ? 3 : r === CharacterRole.SECONDARY ? 2 : 1;
+                      return score(b.role) - score(a.role);
+                  });
+                  
+                  const bestContext = matchingContexts[0];
+                  
+                  if (bestContext) {
+                      const entityBaseY = getEntityY(bestContext.heightIndex);
                       const shift = relevantTitle.verticalShift || 0;
                       // Place person relative to entity. 
                       // Default (shift 0) puts them slightly offset from top of entity block
@@ -154,7 +180,8 @@ const Timeline: React.FC<TimelineProps> = ({
 
       // Fallback: Use global verticalPosition as a multiplier of a standard row height, 
       // placed below the entity layers
-      const fallbackBaseY = (maxEntityIndex + 1) * ENTITY_LAYER_HEIGHT + (100 * globalScale);
+      // Reduced buffer from 100 to 20
+      const fallbackBaseY = TOP_RULER_HEIGHT + ((maxEntityIndex + 1) * ENTITY_LAYER_HEIGHT) + (20 * globalScale);
       return fallbackBaseY + (person.verticalPosition * SLOT_HEIGHT);
   };
   
@@ -487,7 +514,8 @@ const Timeline: React.FC<TimelineProps> = ({
                       const w = yearToX(period.endYear) - x;
                       const y = getEntityY(period.heightIndex);
                       const rowSpan = period.rowSpan || 1;
-                      const height = (ENTITY_LAYER_HEIGHT * rowSpan) - (40 * globalScale);
+                      // Subtract 1px for a thin separator line, leaving no large gap
+                      const height = (ENTITY_LAYER_HEIGHT * rowSpan) - 1;
 
                       // Only show text if wide enough to be readable
                       const showText = w > 60;
@@ -503,7 +531,7 @@ const Timeline: React.FC<TimelineProps> = ({
                             top: y,
                             height: height,
                             backgroundColor: period.color,
-                            border: '1px solid rgba(255,255,255,0.05)',
+                            // Use partial transparency for separator effect if desired, or relying on height calc
                             fontSize: `${18 * globalScale}px`,
                             alignItems: 'center'
                           }}

@@ -88,9 +88,9 @@ const CharacterNode: React.FC<CharacterNodeProps> = ({
   // Use person's custom color if set, otherwise fallback to dynasty color
   const borderColor = person.color || dynasty?.color || '#9ca3af';
   
-  // Sizing Logic: Nucleus 40, Secondary 30, Tertiary 20 (all scaled)
+  // Sizing Logic: Nucleus 50 (was 40), Secondary 30, Tertiary 20 (all scaled)
   let baseSize = 30;
-  if (effectiveRole === CharacterRole.NUCLEUS) baseSize = 40;
+  if (effectiveRole === CharacterRole.NUCLEUS) baseSize = 50; // Increased to 50
   else if (effectiveRole === CharacterRole.TERTIARY) baseSize = 20;
 
   const imageSize = baseSize * scale;
@@ -132,10 +132,10 @@ const CharacterNode: React.FC<CharacterNodeProps> = ({
 
   // Layout calculations based on scale
   const lifespanTopOffset = imageSize + (4 * scale);
-  const namePlateWidth = 200 * scale;
-  const fontSizeBase = Math.max(8, 12 * scale); // Clamp min font size for readability
+  const namePlateWidth = 130 * scale;
+  const fontSizeBase = Math.max(8, 11 * scale); 
   const fontSizeSmall = Math.max(7, 9 * scale);
-  const titleTrackHeight = 26 * scale;
+  const titleTrackHeight = 20 * scale; // Increased from 14 to 20 for more padding
 
   // Toggle button style
   const sideBtnStyle = {
@@ -262,12 +262,12 @@ const CharacterNode: React.FC<CharacterNodeProps> = ({
         {/* Name Plate */}
         <div 
             className="flex flex-col gap-1 w-full items-center relative z-30"
-            style={{ marginTop: `${8 * scale}px` }}
+            style={{ marginTop: `${4 * scale}px` }} 
         >
             <div 
                 className="bg-gray-800/90 backdrop-blur-sm border border-gray-700 rounded-md text-center shadow-lg"
                 style={{ 
-                    padding: `${6 * scale}px`, 
+                    padding: `${2 * scale}px ${6 * scale}px`, // Reduced vertical padding
                     maxWidth: `${namePlateWidth}px`
                 }}
             >
@@ -282,7 +282,7 @@ const CharacterNode: React.FC<CharacterNodeProps> = ({
                 
                 {/* Lifespan Years & Duration */}
                 {settings.showLifespans && (
-                    <div style={{ marginTop: `${4 * scale}px` }}>
+                    <div style={{ marginTop: `${1 * scale}px` }}>
                         <div 
                             className="text-gray-400 font-mono leading-tight"
                             style={{ fontSize: `${fontSizeSmall}px` }}
@@ -352,9 +352,9 @@ const CharacterNode: React.FC<CharacterNodeProps> = ({
                                 width: `${Math.max(segWidth, 4)}px`,
                             }}
                         >
-                            {/* The Colored Bar */}
+                            {/* The Colored Bar - rounded-md */}
                             <div 
-                                className="w-full h-full rounded-sm overflow-hidden flex flex-col justify-center transition-colors"
+                                className="w-full h-full rounded-md overflow-hidden flex flex-col justify-center transition-colors"
                                 style={{
                                     backgroundColor: isHiddenPeriod ? 'transparent' : bgColor,
                                     borderColor: isHiddenPeriod ? 'transparent' : borderColor,
