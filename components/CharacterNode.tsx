@@ -41,6 +41,9 @@ const CharacterNode: React.FC<CharacterNodeProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [dragDy, setDragDy] = useState(0);
 
+  // Highlighting State
+  const isHighlighted = settings.highlightedDynastyId === person.dynastyId && !!settings.highlightedDynastyId;
+
   // Drag Logic
   useEffect(() => {
     if (!isDragging) return;
@@ -158,12 +161,12 @@ const CharacterNode: React.FC<CharacterNodeProps> = ({
 
   return (
     <div
-      className={`absolute flex flex-col items-start group select-none ${isDragging ? 'cursor-grabbing z-50' : 'cursor-grab hover:z-40'}`}
+      className={`absolute flex flex-col items-start group select-none transition-opacity duration-300 ${isDragging ? 'cursor-grabbing z-50' : 'cursor-grab hover:z-40'} ${settings.highlightedDynastyId && !isHighlighted ? 'opacity-30' : 'opacity-100'}`}
       style={{
         left: x,
         top: y + dragDy, // Apply drag offset visually
         width: width,
-        transition: isDragging ? 'none' : 'top 0.3s ease-in-out'
+        transition: isDragging ? 'none' : 'top 0.3s ease-in-out, opacity 0.3s ease-in-out'
       }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -235,10 +238,10 @@ const CharacterNode: React.FC<CharacterNodeProps> = ({
 
             {/* Portrait */}
             <div 
-                className={`rounded-full overflow-hidden bg-gray-900 shadow-lg relative z-20`}
+                className={`rounded-full overflow-hidden bg-gray-900 shadow-lg relative z-20 transition-all duration-300 ${isHighlighted ? 'scale-110 shadow-[0_0_20px_#fbbf24]' : ''}`}
                 style={{
-                    borderColor: borderColor,
-                    borderWidth: `${2 * scale}px`,
+                    borderColor: isHighlighted ? '#fbbf24' : borderColor,
+                    borderWidth: isHighlighted ? `${4 * scale}px` : `${2 * scale}px`,
                     borderStyle: 'solid',
                     width: imageSize,
                     height: imageSize,
@@ -275,7 +278,7 @@ const CharacterNode: React.FC<CharacterNodeProps> = ({
             style={{ marginTop: `${4 * scale}px` }} 
         >
             <div 
-                className="bg-gray-800/90 backdrop-blur-sm border border-gray-700 rounded-md text-center shadow-lg"
+                className={`bg-gray-800/90 backdrop-blur-sm border rounded-md text-center shadow-lg transition-colors duration-300 ${isHighlighted ? 'border-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.3)] bg-amber-950/40' : 'border-gray-700'}`}
                 style={{ 
                     padding: `${2 * scale}px ${6 * scale}px`, // Reduced vertical padding
                     maxWidth: `${namePlateWidth}px`
@@ -284,7 +287,7 @@ const CharacterNode: React.FC<CharacterNodeProps> = ({
                 
                 {/* Name */}
                 <div 
-                    className="font-bold text-white truncate leading-tight"
+                    className={`font-bold truncate leading-tight transition-colors ${isHighlighted ? 'text-amber-200' : 'text-white'}`}
                     style={{ fontSize: `${fontSizeBase}px` }}
                 >
                     {person.officialName}

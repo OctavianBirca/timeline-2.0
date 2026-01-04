@@ -1,14 +1,15 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import ReactDOM from 'react-dom';
-import { ZoomIn, ZoomOut, Grid, Heart, GitMerge, Clock, Users, ChevronDown, Check, EyeOff, RotateCcw, Eye } from 'lucide-react';
-import { ViewSettings, Person } from '../types';
+import { ZoomIn, ZoomOut, Grid, Heart, GitMerge, Clock, Users, ChevronDown, Check, EyeOff, RotateCcw, Eye, Sparkles } from 'lucide-react';
+import { ViewSettings, Person, Dynasty } from '../types';
 import { LABELS } from '../constants';
 
 interface TopBarProps {
   settings: ViewSettings;
   updateSetting: (key: keyof ViewSettings, value: any) => void;
   people: Person[];
+  dynasties: Dynasty[];
   onUnhidePerson: (id: string) => void;
   onResetView: () => void;
 }
@@ -33,6 +34,89 @@ const ToggleBtn = ({
     <span className="hidden md:inline">{label}</span>
   </button>
 );
+
+// Portal-based Dropdown for Dynasty Highlighting
+const DynastyHighlightDropdown: React.FC<{
+    settings: ViewSettings;
+    dynasties: Dynasty[];
+    updateSetting: (key: keyof ViewSettings, value: any) => void;
+}> = ({ settings, dynasties, updateSetting }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const triggerRef = useRef<HTMLButtonElement>(null);
+    const [coords, setCoords] = useState({ top: 0, left: 0 });
+
+    useEffect(() => {
+        if (isOpen && triggerRef.current) {
+            const rect = triggerRef.current.getBoundingClientRect();
+            setCoords({
+                top: rect.bottom + 4,
+                left: rect.left
+            });
+        }
+    }, [isOpen]);
+
+    useEffect(() => {
+        const handleClose = () => setIsOpen(false);
+        window.addEventListener('scroll', handleClose, true);
+        window.addEventListener('resize', handleClose);
+        return () => {
+            window.removeEventListener('scroll', handleClose, true);
+            window.removeEventListener('resize', handleClose);
+        }
+    }, []);
+
+    const currentDynasty = dynasties.find(d => d.id === settings.highlightedDynastyId);
+
+    return (
+        <>
+            <button
+                ref={triggerRef}
+                onClick={() => setIsOpen(!isOpen)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                  settings.highlightedDynastyId
+                    ? 'bg-amber-500 text-black border border-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.5)]' 
+                    : 'bg-gray-800 text-gray-400 border border-gray-700 hover:bg-gray-700'
+                }`}
+            >
+                <Sparkles size={14} />
+                <span className="hidden md:inline">{currentDynasty ? currentDynasty.name : 'Dynasties'}</span>
+                <ChevronDown size={12} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {isOpen && ReactDOM.createPortal(
+                <>
+                    <div className="fixed inset-0 z-[60]" onClick={() => setIsOpen(false)}></div>
+                    <div 
+                        className="fixed z-[70] bg-gray-800 border border-gray-700 rounded-lg shadow-xl p-2 w-56 flex flex-col gap-1 max-h-80 overflow-y-auto custom-scrollbar"
+                        style={{ top: coords.top, left: coords.left }}
+                    >
+                        <button 
+                            onClick={() => { updateSetting('highlightedDynastyId', undefined); setIsOpen(false); }}
+                            className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-700 text-xs text-gray-400 w-full text-left italic"
+                        >
+                            None (Clear Tracking)
+                        </button>
+                        
+                        <div className="h-px bg-gray-700 my-1"></div>
+
+                        {dynasties.map(d => (
+                            <button 
+                                key={d.id}
+                                onClick={() => { updateSetting('highlightedDynastyId', d.id); setIsOpen(false); }}
+                                className={`flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-700 text-xs w-full text-left transition-colors ${settings.highlightedDynastyId === d.id ? 'bg-amber-900/40 text-amber-400 font-bold' : 'text-gray-200'}`}
+                            >
+                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: d.color }}></div>
+                                <span className="flex-1 truncate">{d.name}</span>
+                                {settings.highlightedDynastyId === d.id && <Check size={12} />}
+                            </button>
+                        ))}
+                    </div>
+                </>,
+                document.body
+            )}
+        </>
+    );
+};
 
 // Portal-based Dropdown for Visibility settings
 const VisibilityDropdown: React.FC<{
@@ -208,7 +292,7 @@ const HiddenItemsDropdown: React.FC<{
 };
 
 
-const TopBar: React.FC<TopBarProps> = ({ settings, updateSetting, people, onUnhidePerson, onResetView }) => {
+const TopBar: React.FC<TopBarProps> = ({ settings, updateSetting, people, dynasties, onUnhidePerson, onResetView }) => {
   return (
     <div className="h-14 bg-gray-900/95 backdrop-blur border-b border-gray-800 flex items-center justify-between px-4 fixed top-0 left-0 right-0 z-40 ml-12 lg:ml-0 transition-all">
       
@@ -247,6 +331,9 @@ const TopBar: React.FC<TopBarProps> = ({ settings, updateSetting, people, onUnhi
         </div>
 
         <div className="w-px h-6 bg-gray-800 mx-2 shrink-0"></div>
+
+        {/* Dynasty Tracking Dropdown */}
+        <DynastyHighlightDropdown settings={settings} dynasties={dynasties} updateSetting={updateSetting} />
 
         {/* Toggles */}
         <VisibilityDropdown settings={settings} updateSetting={updateSetting} />

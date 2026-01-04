@@ -139,6 +139,7 @@ export interface ViewSettings {
   showMarriages: boolean;
   showParentalConnections: boolean;
   forceVisibleIds: string[]; 
+  highlightedDynastyId?: string;
 }
 
 export interface LanguageDictionary {

@@ -69,7 +69,8 @@ const App: React.FC = () => {
     showGrid: true,
     showMarriages: true,
     showParentalConnections: true,
-    forceVisibleIds: []
+    forceVisibleIds: [],
+    highlightedDynastyId: undefined
   });
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -433,8 +434,9 @@ const App: React.FC = () => {
         settings={settings} 
         updateSetting={updateSetting} 
         people={people}
+        dynasties={dynasties}
         onUnhidePerson={(id) => updatePerson({...people.find(p => p.id === id)!, isHidden: false})}
-        onResetView={() => setViewSettings(prev => ({ ...prev, zoom: PIXELS_PER_YEAR_DEFAULT, forceVisibleIds: [] }))}
+        onResetView={() => setViewSettings(prev => ({ ...prev, zoom: PIXELS_PER_YEAR_DEFAULT, forceVisibleIds: [], highlightedDynastyId: undefined }))}
       />
       
       <Sidebar 
